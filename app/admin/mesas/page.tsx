@@ -80,6 +80,30 @@ const initialMesas = [
     },
     lastOrder: "14:20",
   },
+  {
+    id: 5,
+    number: "5",
+    capacity: 2,
+    status: "free",
+    location: "Área Externa",
+    qrCode: "mesa-5-qr",
+    currentSession: null,
+    lastOrder: null,
+  },
+  {
+    id: 6,
+    number: "6",
+    capacity: 8,
+    status: "reserved",
+    location: "Salão Principal",
+    qrCode: "mesa-6-qr",
+    currentSession: {
+      reservedFor: "19:00",
+      customerName: "Maria Santos",
+      people: 6,
+    },
+    lastOrder: null,
+  },
 ]
 
 export default function MesasManagement() {
@@ -221,6 +245,137 @@ export default function MesasManagement() {
     occupancyRate: Math.round((mesas.filter((m) => m.status === "occupied").length / mesas.length) * 100),
   }
 
+  // Agrupar mesas por localização e status
+  const groupedMesas = mesas.reduce(
+    (acc, mesa) => {
+      if (!acc[mesa.location]) {
+        acc[mesa.location] = {
+          free: [],
+          occupied: [],
+          reserved: [],
+          maintenance: [],
+        }
+      }
+      acc[mesa.location][mesa.status].push(mesa)
+      return acc
+    },
+    {} as Record<string, Record<string, any[]>>,
+  )
+
+  const renderMesaCard = (mesa: any, index: number) => (
+    <motion.div
+      key={mesa.id}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.1 }}
+    >
+      <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${getStatusColor(mesa.status)}`}></div>
+              <CardTitle className="text-lg">Mesa {mesa.number}</CardTitle>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setViewingMesa(mesa)}>
+                  <Eye className="h-4 w-4 mr-2" />
+                  Visualizar
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openEditModal(mesa)}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Editar
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => toggleMesaStatus(mesa.id)}
+                  className={mesa.status === "free" ? "text-red-600" : "text-green-600"}
+                >
+                  {mesa.status === "free" ? (
+                    <>
+                      <Users className="h-4 w-4 mr-2" />
+                      Ocupar Mesa
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Liberar Mesa
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.open(`/qr/${mesa.number}`, "_blank")} className="text-blue-600">
+                  <QrCode className="h-4 w-4 mr-2" />
+                  Ver QR Code
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setDeletingMesa(mesa)} className="text-red-600">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Excluir
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Badge variant="secondary" className="flex items-center space-x-1">
+              {getStatusIcon(mesa.status)}
+              <span>{getStatusText(mesa.status)}</span>
+            </Badge>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{mesa.capacity} lugares</span>
+          </div>
+
+          {mesa.currentSession && mesa.status === "occupied" && (
+            <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg space-y-1">
+              <div className="flex justify-between text-sm">
+                <span>Início:</span>
+                <span className="font-medium">{mesa.currentSession.startTime}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Pessoas:</span>
+                <span className="font-medium">{mesa.currentSession.people}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Pedidos:</span>
+                <span className="font-medium">{mesa.currentSession.orders}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold">
+                <span>Total:</span>
+                <span className="text-red-600">R$ {mesa.currentSession.total?.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
+
+          {mesa.currentSession && mesa.status === "reserved" && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg space-y-1">
+              <div className="flex justify-between text-sm">
+                <span>Reserva:</span>
+                <span className="font-medium">{mesa.currentSession.reservedFor}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Cliente:</span>
+                <span className="font-medium">{mesa.currentSession.customerName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Pessoas:</span>
+                <span className="font-medium">{mesa.currentSession.people}</span>
+              </div>
+            </div>
+          )}
+
+          {mesa.status === "free" && (
+            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg text-center">
+              <p className="text-sm text-green-700 dark:text-green-300 font-medium">Mesa disponível</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -301,127 +456,74 @@ export default function MesasManagement() {
         </Card>
       </div>
 
-      {/* Mesas Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {mesas.map((mesa, index) => (
-          <motion.div
-            key={mesa.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-3 h-3 rounded-full ${getStatusColor(mesa.status)}`}></div>
-                    <CardTitle className="text-lg">Mesa {mesa.number}</CardTitle>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setViewingMesa(mesa)}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        Visualizar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openEditModal(mesa)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => toggleMesaStatus(mesa.id)}
-                        className={mesa.status === "free" ? "text-red-600" : "text-green-600"}
-                      >
-                        {mesa.status === "free" ? (
-                          <>
-                            <Users className="h-4 w-4 mr-2" />
-                            Ocupar Mesa
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Liberar Mesa
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => window.open(`/qr/${mesa.number}`, "_blank")}
-                        className="text-blue-600"
-                      >
-                        <QrCode className="h-4 w-4 mr-2" />
-                        Ver QR Code
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setDeletingMesa(mesa)} className="text-red-600">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+      {/* Mesas Agrupadas por Localização e Status */}
+      <div className="space-y-8">
+        {Object.entries(groupedMesas).map(([location, statusGroups]) => (
+          <div key={location} className="space-y-6">
+            <div className="border-b border-gray-200 dark:border-gray-700 pb-2">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">📍 {location}</h2>
+            </div>
+
+            {/* Mesas Disponíveis */}
+            {statusGroups.free.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <h3 className="text-lg font-semibold text-green-700 dark:text-green-400">
+                    Disponíveis ({statusGroups.free.length})
+                  </h3>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Badge variant="secondary" className="flex items-center space-x-1">
-                    {getStatusIcon(mesa.status)}
-                    <span>{getStatusText(mesa.status)}</span>
-                  </Badge>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">{mesa.capacity} lugares</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {statusGroups.free.map((mesa, index) => renderMesaCard(mesa, index))}
                 </div>
+              </div>
+            )}
 
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  <p>📍 {mesa.location}</p>
+            {/* Mesas Reservadas */}
+            {statusGroups.reserved.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-5 w-5 text-yellow-600" />
+                  <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-400">
+                    Reservadas ({statusGroups.reserved.length})
+                  </h3>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {statusGroups.reserved.map((mesa, index) => renderMesaCard(mesa, index))}
+                </div>
+              </div>
+            )}
 
-                {mesa.currentSession && mesa.status === "occupied" && (
-                  <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>Início:</span>
-                      <span className="font-medium">{mesa.currentSession.startTime}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Pessoas:</span>
-                      <span className="font-medium">{mesa.currentSession.people}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Pedidos:</span>
-                      <span className="font-medium">{mesa.currentSession.orders}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-bold">
-                      <span>Total:</span>
-                      <span className="text-red-600">R$ {mesa.currentSession.total?.toFixed(2)}</span>
-                    </div>
-                  </div>
-                )}
+            {/* Mesas Ocupadas */}
+            {statusGroups.occupied.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Users className="h-5 w-5 text-red-600" />
+                  <h3 className="text-lg font-semibold text-red-700 dark:text-red-400">
+                    Ocupadas ({statusGroups.occupied.length})
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {statusGroups.occupied.map((mesa, index) => renderMesaCard(mesa, index))}
+                </div>
+              </div>
+            )}
 
-                {mesa.currentSession && mesa.status === "reserved" && (
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>Reserva:</span>
-                      <span className="font-medium">{mesa.currentSession.reservedFor}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Cliente:</span>
-                      <span className="font-medium">{mesa.currentSession.customerName}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Pessoas:</span>
-                      <span className="font-medium">{mesa.currentSession.people}</span>
-                    </div>
-                  </div>
-                )}
-
-                {mesa.status === "free" && (
-                  <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg text-center">
-                    <p className="text-sm text-green-700 dark:text-green-300 font-medium">Mesa disponível</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
+            {/* Mesas em Manutenção */}
+            {statusGroups.maintenance.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Settings className="h-5 w-5 text-gray-600" />
+                  <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-400">
+                    Em Manutenção ({statusGroups.maintenance.length})
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {statusGroups.maintenance.map((mesa, index) => renderMesaCard(mesa, index))}
+                </div>
+              </div>
+            )}
+          </div>
         ))}
       </div>
 
