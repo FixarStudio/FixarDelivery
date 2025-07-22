@@ -1,398 +1,422 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react"
+import { motion } from "framer-motion"
+import {
+  Clock,
+  Flame,
+  CheckCircle,
+  Play,
+  Pause,
+  RotateCcw,
+  Edit3,
+  Filter,
+  BarChart3,
+  Timer,
+  AlertTriangle,
+  Volume2,
+  VolumeX,
+} from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Clock, Flame, CheckCircle, Play, RotateCcw, TrendingUp, Users, Timer } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 
-interface QueueOrder {
-  id: string
-  customerName: string
-  table?: string
-  address?: string
-  status: "aguardando" | "preparando" | "finalizado"
-  items: Array<{
-    name: string
-    quantity: number
-    customizations?: string[]
-  }>
-  total: number
-  estimatedTime: number
-  createdAt: string
-  startedAt?: string
-  completedAt?: string
+// Mock data para demonstração
+const mockPedidos = [
+  {
+    id: "1024",
+    numero: "1024",
+    cliente: "João Silva",
+    mesa: "05",
+    status: "aguardando",
+    itens: ["2x Hambúrguer Clássico", "1x Batata Frita G", "2x Coca-Cola"],
+    total: 57.0,
+    horario: "19:35",
+    tempoEstimado: 25,
+    observacoes: "Bacon extra, sem cebola",
+  },
+  {
+    id: "1023",
+    numero: "1023",
+    cliente: "Maria Santos",
+    mesa: "Delivery",
+    status: "preparando",
+    itens: ["1x Pizza Margherita", "1x Suco Natural"],
+    total: 42.5,
+    horario: "19:30",
+    tempoEstimado: 15,
+    observacoes: "",
+  },
+  {
+    id: "1022",
+    numero: "1022",
+    cliente: "Pedro Costa",
+    mesa: "03",
+    status: "finalizado",
+    itens: ["1x Salada Caesar", "1x Água"],
+    total: 28.0,
+    horario: "19:25",
+    tempoEstimado: 0,
+    observacoes: "",
+  },
+  {
+    id: "1025",
+    numero: "1025",
+    cliente: "Ana Lima",
+    mesa: "07",
+    status: "aguardando",
+    itens: ["3x Hambúrguer Especial", "2x Batata", "3x Refrigerante"],
+    total: 89.5,
+    horario: "19:40",
+    tempoEstimado: 35,
+    observacoes: "Sem picles, ponto da carne bem passado",
+  },
+]
+
+const statusConfig = {
+  aguardando: {
+    color: "bg-blue-500",
+    textColor: "text-blue-700",
+    bgColor: "bg-blue-50 dark:bg-blue-900/20",
+    icon: Clock,
+    text: "Aguardando",
+  },
+  preparando: {
+    color: "bg-orange-500",
+    textColor: "text-orange-700",
+    bgColor: "bg-orange-50 dark:bg-orange-900/20",
+    icon: Flame,
+    text: "Preparando",
+  },
+  finalizado: {
+    color: "bg-green-500",
+    textColor: "text-green-700",
+    bgColor: "bg-green-50 dark:bg-green-900/20",
+    icon: CheckCircle,
+    text: "Finalizado",
+  },
 }
 
 export default function FilaProducao() {
-  const [orders, setOrders] = useState<QueueOrder[]>([])
-  const [metrics, setMetrics] = useState({
-    averageTime: 28,
-    ordersToday: 45,
-    currentQueue: 8,
-    efficiency: 92,
+  const [pedidos, setPedidos] = useState(mockPedidos)
+  const [filtroStatus, setFiltroStatus] = useState("todos")
+  const [somAtivado, setSomAtivado] = useState(true)
+  const [editandoTempo, setEditandoTempo] = useState<string | null>(null)
+  const [novoTempo, setNovoTempo] = useState("")
+
+  // Métricas calculadas
+  const metricas = {
+    total: pedidos.length,
+    aguardando: pedidos.filter((p) => p.status === "aguardando").length,
+    preparando: pedidos.filter((p) => p.status === "preparando").length,
+    finalizado: pedidos.filter((p) => p.status === "finalizado").length,
+    tempoMedio: Math.round(
+      pedidos.filter((p) => p.status !== "finalizado").reduce((acc, p) => acc + p.tempoEstimado, 0) /
+        pedidos.filter((p) => p.status !== "finalizado").length || 0,
+    ),
+  }
+
+  const pedidosFiltrados = pedidos.filter((pedido) => {
+    if (filtroStatus === "todos") return true
+    return pedido.status === filtroStatus
   })
 
-  // Mock data
-  useEffect(() => {
-    const mockOrders: QueueOrder[] = [
-      {
-        id: "1022",
-        customerName: "Ana Costa",
-        table: "3",
-        status: "finalizado",
-        items: [
-          { name: "Pizza Margherita", quantity: 1 },
-          { name: "Refrigerante", quantity: 2 },
-        ],
-        total: 45.0,
-        estimatedTime: 25,
-        createdAt: "19:15",
-        startedAt: "19:20",
-        completedAt: "19:40",
-      },
-      {
-        id: "1023",
-        customerName: "João Silva",
-        status: "preparando",
-        items: [
-          { name: "Hambúrguer Clássico", quantity: 2, customizations: ["Bacon extra"] },
-          { name: "Batata Frita", quantity: 1 },
-        ],
-        total: 57.0,
-        estimatedTime: 30,
-        createdAt: "19:25",
-        startedAt: "19:35",
-      },
-      {
-        id: "1024",
-        customerName: "Maria Lima",
-        table: "7",
-        status: "aguardando",
-        items: [
-          { name: "Salada Caesar", quantity: 1 },
-          { name: "Suco Natural", quantity: 1 },
-        ],
-        total: 32.0,
-        estimatedTime: 20,
-        createdAt: "19:30",
-      },
-      {
-        id: "1025",
-        customerName: "Pedro Santos",
-        address: "R. das Palmeiras, 456",
-        status: "aguardando",
-        items: [
-          { name: "Pizza Portuguesa", quantity: 1 },
-          { name: "Guaraná", quantity: 1 },
-        ],
-        total: 52.0,
-        estimatedTime: 35,
-        createdAt: "19:32",
-      },
-    ]
-
-    setOrders(mockOrders)
-  }, [])
-
-  const updateOrderStatus = (orderId: string, newStatus: QueueOrder["status"]) => {
-    setOrders((prev) =>
-      prev.map((order) => {
-        if (order.id === orderId) {
-          const now = new Date().toLocaleTimeString("pt-BR", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-
+  const alterarStatus = (pedidoId: string, novoStatus: string) => {
+    setPedidos((prev) =>
+      prev.map((pedido) => {
+        if (pedido.id === pedidoId) {
           return {
-            ...order,
-            status: newStatus,
-            startedAt: newStatus === "preparando" && !order.startedAt ? now : order.startedAt,
-            completedAt: newStatus === "finalizado" ? now : order.completedAt,
+            ...pedido,
+            status: novoStatus,
+            tempoEstimado: novoStatus === "finalizado" ? 0 : pedido.tempoEstimado,
           }
         }
-        return order
+        return pedido
       }),
     )
-  }
 
-  const updateEstimatedTime = (orderId: string, time: number) => {
-    setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, estimatedTime: time } : order)))
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "aguardando":
-        return <Clock className="h-4 w-4" />
-      case "preparando":
-        return <Flame className="h-4 w-4" />
-      case "finalizado":
-        return <CheckCircle className="h-4 w-4" />
-      default:
-        return <Clock className="h-4 w-4" />
+    if (somAtivado) {
+      // Simular som de notificação
+      console.log("🔔 Som de notificação para mudança de status")
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "aguardando":
-        return "bg-blue-100 text-blue-700 border-blue-200"
-      case "preparando":
-        return "bg-orange-100 text-orange-700 border-orange-200"
-      case "finalizado":
-        return "bg-green-100 text-green-700 border-green-200"
-      default:
-        return "bg-gray-100 text-gray-700 border-gray-200"
-    }
+  const editarTempo = (pedidoId: string, tempo: number) => {
+    setPedidos((prev) => prev.map((pedido) => (pedido.id === pedidoId ? { ...pedido, tempoEstimado: tempo } : pedido)))
+    setEditandoTempo(null)
+    setNovoTempo("")
   }
 
-  const ordersByStatus = {
-    aguardando: orders.filter((o) => o.status === "aguardando"),
-    preparando: orders.filter((o) => o.status === "preparando"),
-    finalizado: orders.filter((o) => o.status === "finalizado"),
+  const iniciarEdicaoTempo = (pedidoId: string, tempoAtual: number) => {
+    setEditandoTempo(pedidoId)
+    setNovoTempo(tempoAtual.toString())
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Fila de Produção</h1>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="px-3 py-1">
-            <Timer className="h-4 w-4 mr-1" />
-            Tempo médio: {metrics.averageTime}min
-          </Badge>
-        </div>
-      </div>
-
-      {/* Métricas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-blue-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Pedidos Hoje</p>
-                <p className="text-2xl font-bold">{metrics.ordersToday}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-orange-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Na Fila</p>
-                <p className="text-2xl font-bold">{metrics.currentQueue}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Timer className="h-5 w-5 text-green-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Tempo Médio</p>
-                <p className="text-2xl font-bold">{metrics.averageTime}min</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-purple-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Eficiência</p>
-                <p className="text-2xl font-bold">{metrics.efficiency}%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Fila de Pedidos */}
-      <Tabs defaultValue="todos" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="todos">Todos ({orders.length})</TabsTrigger>
-          <TabsTrigger value="aguardando">Aguardando ({ordersByStatus.aguardando.length})</TabsTrigger>
-          <TabsTrigger value="preparando">Preparando ({ordersByStatus.preparando.length})</TabsTrigger>
-          <TabsTrigger value="finalizado">Finalizados ({ordersByStatus.finalizado.length})</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="todos" className="space-y-4">
-          {orders.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              onStatusChange={updateOrderStatus}
-              onTimeChange={updateEstimatedTime}
-              getStatusIcon={getStatusIcon}
-              getStatusColor={getStatusColor}
-            />
-          ))}
-        </TabsContent>
-
-        <TabsContent value="aguardando" className="space-y-4">
-          {ordersByStatus.aguardando.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              onStatusChange={updateOrderStatus}
-              onTimeChange={updateEstimatedTime}
-              getStatusIcon={getStatusIcon}
-              getStatusColor={getStatusColor}
-            />
-          ))}
-        </TabsContent>
-
-        <TabsContent value="preparando" className="space-y-4">
-          {ordersByStatus.preparando.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              onStatusChange={updateOrderStatus}
-              onTimeChange={updateEstimatedTime}
-              getStatusIcon={getStatusIcon}
-              getStatusColor={getStatusColor}
-            />
-          ))}
-        </TabsContent>
-
-        <TabsContent value="finalizado" className="space-y-4">
-          {ordersByStatus.finalizado.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              onStatusChange={updateOrderStatus}
-              onTimeChange={updateEstimatedTime}
-              getStatusIcon={getStatusIcon}
-              getStatusColor={getStatusColor}
-            />
-          ))}
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
-}
-
-interface OrderCardProps {
-  order: QueueOrder
-  onStatusChange: (id: string, status: QueueOrder["status"]) => void
-  onTimeChange: (id: string, time: number) => void
-  getStatusIcon: (status: string) => React.ReactNode
-  getStatusColor: (status: string) => string
-}
-
-function OrderCard({ order, onStatusChange, onTimeChange, getStatusIcon, getStatusColor }: OrderCardProps) {
-  const [editingTime, setEditingTime] = useState(false)
-  const [tempTime, setTempTime] = useState(order.estimatedTime)
-
-  const handleTimeSubmit = () => {
-    onTimeChange(order.id, tempTime)
-    setEditingTime(false)
-  }
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="text-lg px-3 py-1">
-              #{order.id}
-            </Badge>
-            <Badge className={`border ${getStatusColor(order.status)}`}>
-              {getStatusIcon(order.status)}
-              <span className="ml-1 capitalize">{order.status}</span>
-            </Badge>
-          </div>
-          <div className="text-sm text-muted-foreground">{order.createdAt}</div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Informações do Cliente */}
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8 flex justify-between items-center">
           <div>
-            <p className="font-medium">{order.customerName}</p>
-            <p className="text-sm text-muted-foreground">{order.table ? `Mesa ${order.table}` : order.address}</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Fila de Produção</h1>
+            <p className="text-gray-600 dark:text-gray-400">Gerencie pedidos em tempo real</p>
           </div>
-          <div className="text-right">
-            <p className="font-medium">R$ {order.total.toFixed(2)}</p>
-            <div className="flex items-center gap-2">
-              {editingTime ? (
-                <div className="flex items-center gap-1">
-                  <Input
-                    type="number"
-                    value={tempTime}
-                    onChange={(e) => setTempTime(Number(e.target.value))}
-                    className="w-16 h-6 text-xs"
-                  />
-                  <Button size="sm" variant="ghost" onClick={handleTimeSubmit}>
-                    ✓
-                  </Button>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="som-toggle">Som</Label>
+              <Switch
+                id="som-toggle"
+                checked={somAtivado}
+                onCheckedChange={setSomAtivado}
+                className="data-[state=checked]:bg-orange-500"
+              />
+              {somAtivado ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </div>
+          </div>
+        </div>
+
+        {/* Métricas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{metricas.total}</p>
                 </div>
-              ) : (
-                <Button variant="ghost" size="sm" onClick={() => setEditingTime(true)} className="text-xs">
-                  {order.estimatedTime}min
-                </Button>
-              )}
+                <BarChart3 className="h-8 w-8 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Aguardando</p>
+                  <p className="text-2xl font-bold text-blue-600">{metricas.aguardando}</p>
+                </div>
+                <Clock className="h-8 w-8 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Preparando</p>
+                  <p className="text-2xl font-bold text-orange-600">{metricas.preparando}</p>
+                </div>
+                <Flame className="h-8 w-8 text-orange-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Finalizados</p>
+                  <p className="text-2xl font-bold text-green-600">{metricas.finalizado}</p>
+                </div>
+                <CheckCircle className="h-8 w-8 text-green-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Tempo Médio</p>
+                  <p className="text-2xl font-bold text-purple-600">{metricas.tempoMedio} min</p>
+                </div>
+                <Timer className="h-8 w-8 text-purple-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filtros */}
+        <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg mb-8">
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-4">
+              <Filter className="h-5 w-5 text-gray-600" />
+              <Label>Filtrar por status:</Label>
+              <div className="flex space-x-2">
+                {["todos", "aguardando", "preparando", "finalizado"].map((status) => (
+                  <Button
+                    key={status}
+                    variant={filtroStatus === status ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFiltroStatus(status)}
+                    className="capitalize"
+                  >
+                    {status === "todos" ? "Todos" : statusConfig[status as keyof typeof statusConfig]?.text}
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
+          </CardContent>
+        </Card>
+
+        {/* Lista de Pedidos */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {pedidosFiltrados.map((pedido, index) => {
+            const config = statusConfig[pedido.status as keyof typeof statusConfig]
+            const IconComponent = config.icon
+
+            return (
+              <motion.div
+                key={pedido.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <Card
+                  className={`${config.bgColor} border-l-4 ${config.color} shadow-lg hover:shadow-xl transition-all duration-300`}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <IconComponent className={`h-5 w-5 ${config.textColor}`} />
+                        <CardTitle className="text-lg">Pedido #{pedido.numero}</CardTitle>
+                      </div>
+                      <Badge className={`${config.color} text-white`}>{config.text}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Cliente</p>
+                        <p className="font-semibold">{pedido.cliente}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Mesa/Local</p>
+                        <p className="font-semibold">{pedido.mesa}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Itens</p>
+                      <div className="space-y-1">
+                        {pedido.itens.map((item, idx) => (
+                          <p key={idx} className="text-sm">
+                            • {item}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+
+                    {pedido.observacoes && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Observações</p>
+                        <p className="text-sm bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded">{pedido.observacoes}</p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
+                        <p className="font-bold text-lg">R$ {pedido.total.toFixed(2)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Tempo Estimado</p>
+                        {editandoTempo === pedido.id ? (
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={novoTempo}
+                              onChange={(e) => setNovoTempo(e.target.value)}
+                              className="w-16 h-8 text-sm"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => editarTempo(pedido.id, Number.parseInt(novoTempo) || 0)}
+                              className="h-8 px-2"
+                            >
+                              ✓
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <p className="font-bold text-lg">{pedido.tempoEstimado} min</p>
+                            {pedido.status !== "finalizado" && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => iniciarEdicaoTempo(pedido.id, pedido.tempoEstimado)}
+                                className="h-6 w-6 p-0"
+                              >
+                                <Edit3 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Ações */}
+                    <div className="flex space-x-2 pt-4">
+                      {pedido.status === "aguardando" && (
+                        <Button
+                          onClick={() => alterarStatus(pedido.id, "preparando")}
+                          className="flex-1 bg-orange-500 hover:bg-orange-600"
+                        >
+                          <Play className="h-4 w-4 mr-2" />
+                          Iniciar
+                        </Button>
+                      )}
+                      {pedido.status === "preparando" && (
+                        <>
+                          <Button
+                            onClick={() => alterarStatus(pedido.id, "aguardando")}
+                            variant="outline"
+                            className="flex-1"
+                          >
+                            <Pause className="h-4 w-4 mr-2" />
+                            Pausar
+                          </Button>
+                          <Button
+                            onClick={() => alterarStatus(pedido.id, "finalizado")}
+                            className="flex-1 bg-green-500 hover:bg-green-600"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Finalizar
+                          </Button>
+                        </>
+                      )}
+                      {pedido.status === "finalizado" && (
+                        <Button
+                          onClick={() => alterarStatus(pedido.id, "preparando")}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Reabrir
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )
+          })}
         </div>
 
-        {/* Itens do Pedido */}
-        <div className="space-y-1">
-          {order.items.map((item, index) => (
-            <div key={index} className="text-sm">
-              <span className="font-medium">
-                {item.quantity}x {item.name}
-              </span>
-              {item.customizations && item.customizations.length > 0 && (
-                <span className="text-muted-foreground ml-2">({item.customizations.join(", ")})</span>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Ações */}
-        <div className="flex gap-2 pt-2">
-          {order.status === "aguardando" && (
-            <Button size="sm" onClick={() => onStatusChange(order.id, "preparando")} className="flex-1">
-              <Play className="h-4 w-4 mr-1" />
-              Iniciar
-            </Button>
-          )}
-
-          {order.status === "preparando" && (
-            <>
-              <Button size="sm" variant="outline" onClick={() => onStatusChange(order.id, "aguardando")}>
-                <RotateCcw className="h-4 w-4 mr-1" />
-                Pausar
-              </Button>
-              <Button size="sm" onClick={() => onStatusChange(order.id, "finalizado")} className="flex-1">
-                <CheckCircle className="h-4 w-4 mr-1" />
-                Finalizar
-              </Button>
-            </>
-          )}
-
-          {order.status === "finalizado" && (
-            <Button size="sm" variant="outline" onClick={() => onStatusChange(order.id, "preparando")}>
-              <RotateCcw className="h-4 w-4 mr-1" />
-              Reabrir
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        {pedidosFiltrados.length === 0 && (
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <CardContent className="p-8 text-center">
+              <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600 dark:text-gray-400">Nenhum pedido encontrado para o filtro selecionado.</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
   )
 }
