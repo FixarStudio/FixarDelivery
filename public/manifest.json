@@ -1,0 +1,27 @@
+{
+  "name": "Cardápio Digital Premium",
+  "short_name": "Cardápio Digital",
+  "description": "Cardápio digital interativo com integração WhatsApp",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ea580c",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "categories": ["food", "business", "productivity"],
+  "lang": "pt-BR",
+  "dir": "ltr"
+}
