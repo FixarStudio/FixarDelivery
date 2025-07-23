@@ -37,44 +37,38 @@ export default function AdminLogin() {
   }
 
   const handleSubmit = async (e: any) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError("")
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
 
-    // Simular delay de autenticação
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    // Validar credenciais
-    if (formData.username === ADMIN_CREDENTIALS.username && formData.password === ADMIN_CREDENTIALS.password) {
-      // Criar token de sessão (24 horas)
-      const token = {
-        value: `admin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        expires: new Date().getTime() + 24 * 60 * 60 * 1000, // 24 horas
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.username, // ou formData.email, conforme seu campo
+          password: formData.password,
+        }),
+      });
+      const data = await res.json();
+      console.log('Login response:', data);
+      if (res.ok) {
+        alert('Login realizado com sucesso! Redirecionando para o painel...');
+        router.push("/admin")
+      } else {
+        setError(data.error || "Erro ao fazer login");
+        alert(data.error || "Erro ao fazer login");
       }
-
-      const user = {
-        username: formData.username,
-        role: "admin",
-        loginTime: new Date().toISOString(),
-      }
-
-      // Salvar no localStorage
-      localStorage.setItem("admin_token", JSON.stringify(token))
-      localStorage.setItem("admin_user", JSON.stringify(user))
-
-      // Redirecionar para admin
-      router.push("/admin")
-    } else {
-      setError("Usuário ou senha incorretos")
+    } catch (err) {
+      setError("Erro de conexão");
     }
-
-    setIsLoading(false)
+    setIsLoading(false);
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
+    <div className="fixed inset-0 w-screen h-screen min-w-0 min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50">
       {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10">
+      <div className="absolute inset-0 opacity-10 ">
         <div className="absolute inset-0 bg-gradient-to-r from-orange-100 to-red-100 dark:from-gray-800 dark:to-gray-700"></div>
       </div>
 
@@ -100,19 +94,13 @@ export default function AdminLogin() {
 
           <CardContent className="space-y-6 pt-6">
             {/* Demo Credentials Alert */}
-            <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-              <AlertCircle className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm">
-                <strong>Demo:</strong> usuário: <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">admin</code>{" "}
-                | senha: <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">admin123</code>
-              </AlertDescription>
-            </Alert>
+
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Username Field */}
               <div className="space-y-2">
                 <Label htmlFor="username" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Usuário
+                  E-mail
                 </Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />

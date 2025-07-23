@@ -1,16 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Search, ShoppingCart, Moon, Sun, Filter } from "lucide-react"
+import { motion, AnimatePresence, easeOut } from "framer-motion"
+import { Search, ShoppingCart, Moon, Sun, QrCode, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CartModal } from "@/components/cart-modal"
 import { ProductCard } from "@/components/product-card"
-import { ThemeCustomizer } from "@/components/theme-customizer"
 import { WhatsAppIntegration } from "@/components/whatsapp-integration"
+import { MesaStatusBar } from "@/components/estabelecimento/mesa-status-bar"
+import { MesaSelector } from "@/components/estabelecimento/mesa-selector"
 
 // Mock data para demonstração
 const categories = [
@@ -76,19 +76,42 @@ const products = [
   },
 ]
 
-export default function CardapioDigital() {
+export default function EstabelecimentoPage() {
   const [isDark, setIsDark] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [cart, setCart] = useState<any[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
+  const [currentTable, setCurrentTable] = useState<string | null>(null)
+  const [showMesaSelector, setShowMesaSelector] = useState(false)
+
   const [restaurantInfo] = useState({
     name: "Restaurante Premium",
     logo: "/placeholder.svg?height=60&width=120",
     table: "Mesa 12",
     area: "Salão Principal",
   })
+
+  // Detectar mesa pela URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const mesa = urlParams.get("mesa")
+    if (mesa) {
+      setCurrentTable(mesa)
+      setShowMesaSelector(false)
+    } else {
+      setShowMesaSelector(true)
+    }
+  }, [])
+
+  const handleMesaSelect = (mesa: any) => {
+    setCurrentTable(mesa.number)
+    setShowMesaSelector(false)
+    // Atualizar URL sem recarregar a página
+    const newUrl = `${window.location.pathname}?mesa=${mesa.number}`
+    window.history.pushState({}, "", newUrl)
+  }
 
   // Animação de entrada dos produtos
   const containerVariants = {
@@ -108,7 +131,7 @@ export default function CardapioDigital() {
       y: 0,
       transition: {
         duration: 0.5,
-        ease: "easeOut",
+        ease: easeOut,
       },
     },
   }
@@ -165,94 +188,127 @@ export default function CardapioDigital() {
               />
               <div>
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">{restaurantInfo.name}</h1>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {restaurantInfo.table} • {restaurantInfo.area}
-                </p>
+                <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                  {currentTable ? (
+                    <>
+                      <Users className="h-4 w-4" />
+                      <span>Mesa {currentTable}</span>
+                      <span>•</span>
+                      <span>{restaurantInfo.area}</span>
+                    </>
+                  ) : (
+                    <>
+                      <QrCode className="h-4 w-4" />
+                      <span>Estabelecimento</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
             <div className="flex items-center space-x-2">
+              {currentTable && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMesaSelector(true)}
+                  className="flex items-center space-x-1"
+                >
+                  <Users className="h-4 w-4" />
+                  <span>Trocar Mesa</span>
+                </Button>
+              )}
               <Button variant="ghost" size="icon" onClick={() => setIsDark(!isDark)} className="rounded-full">
                 {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </Button>
-
-              <Sheet>
-                
-                
-              </Sheet>
             </div>
           </div>
         </div>
       </motion.header>
 
-      {/* Search Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="container mx-auto px-4 py-4"
-      >
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-          <Input
-            placeholder="Buscar pratos, bebidas..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setIsSearchExpanded(true)}
-            onBlur={() => setIsSearchExpanded(false)}
-            className={`pl-10 transition-all duration-300 ${
-              isSearchExpanded ? "ring-2 ring-orange-500 shadow-lg" : ""
-            } bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm`}
-          />
+      {/* Mesa Selector */}
+      {showMesaSelector && (
+        <div className="container mx-auto px-4 py-8">
+          <MesaSelector onMesaSelect={handleMesaSelect} currentTable={currentTable} />
         </div>
-      </motion.div>
+      )}
 
-      {/* Category Tabs */}
-      <motion.div
-        initial={{ opacity: 0, x: -50 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.3 }}
-        className="container mx-auto px-4 pb-4"
-      >
-        <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
-          <TabsList className="w-full justify-start overflow-x-auto bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-            <TabsTrigger value="all" className="whitespace-nowrap">
-              🍽️ Todos ({products.length})
-            </TabsTrigger>
-            {categories.map((category) => (
-              <TabsTrigger key={category.id} value={category.id} className="whitespace-nowrap">
-                {category.name} ({category.count})
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-      </motion.div>
+      {/* Main Content - só mostra quando uma mesa está selecionada */}
+      {!showMesaSelector && (
+        <>
+          {/* Mesa Status Bar */}
+          <MesaStatusBar currentTable={currentTable} />
 
-      {/* Products Grid */}
-      <div className="container mx-auto px-4 pb-24">
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-        >
-          <AnimatePresence>
-            {filteredProducts.map((product) => (
-              <motion.div key={product.id} variants={itemVariants} layout exit={{ opacity: 0, scale: 0.8 }}>
-                <ProductCard product={product} onAddToCart={addToCart} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
-
-        {filteredProducts.length === 0 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
-            <div className="text-6xl mb-4">🔍</div>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Nenhum produto encontrado</h3>
-            <p className="text-gray-600 dark:text-gray-400">Tente buscar por outro termo ou categoria</p>
+          {/* Search Bar */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="container mx-auto px-4 py-4"
+          >
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <Input
+                placeholder="Buscar pratos, bebidas..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setIsSearchExpanded(true)}
+                onBlur={() => setIsSearchExpanded(false)}
+                className={`pl-10 transition-all duration-300 ${
+                  isSearchExpanded ? "ring-2 ring-orange-500 shadow-lg" : ""
+                } bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm`}
+              />
+            </div>
           </motion.div>
-        )}
-      </div>
+
+          {/* Category Tabs */}
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+            className="container mx-auto px-4 pb-4"
+          >
+            <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
+              <TabsList className="w-full justify-start overflow-x-auto bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+                <TabsTrigger value="all" className="whitespace-nowrap">
+                  🍽️ Todos ({products.length})
+                </TabsTrigger>
+                {categories.map((category) => (
+                  <TabsTrigger key={category.id} value={category.id} className="whitespace-nowrap">
+                    {category.name} ({category.count})
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </motion.div>
+
+          {/* Products Grid */}
+          <div className="container mx-auto px-4 pb-24">
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              <AnimatePresence>
+                {filteredProducts.map((product) => (
+                  <motion.div key={product.id} variants={itemVariants} layout exit={{ opacity: 0, scale: 0.8 }}>
+                    <ProductCard product={product} onAddToCart={addToCart} />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </motion.div>
+
+            {filteredProducts.length === 0 && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
+                <div className="text-6xl mb-4">🔍</div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Nenhum produto encontrado</h3>
+                <p className="text-gray-600 dark:text-gray-400">Tente buscar por outro termo ou categoria</p>
+              </motion.div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Floating Cart Button */}
       <AnimatePresence>
@@ -296,9 +352,21 @@ export default function CardapioDigital() {
       <CartModal
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
-        cart={cart}
-        setCart={setCart}
-        restaurantInfo={restaurantInfo}
+        items={cart}
+        onUpdateQuantity={(id, quantity) => {
+          setCart((prevCart) =>
+            prevCart
+              .map((item) => (item.id === id ? { ...item, quantity } : item))
+              .filter((item) => item.quantity > 0)
+          )
+        }}
+        onRemoveItem={(id) => {
+          setCart((prevCart) => prevCart.filter((item) => item.id !== id))
+        }}
+        onCheckout={() => {
+          setCart([])
+          setIsCartOpen(false)
+        }}
       />
 
       {/* WhatsApp Integration */}

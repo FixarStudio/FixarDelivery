@@ -1,0 +1,140 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // ou "mysql" ou "sqlite" conforme seu .env
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("admin") // admin, atendente, etc
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // Relacionamentos
+  orders    Order[]
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  products  Product[]
+}
+
+model Product {
+  id          String     @id @default(uuid())
+  name        String
+  description String
+  price       Float
+  image       String?
+  available   Boolean    @default(true)
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id])
+  orders      OrderItem[]
+  extras      Extra[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Extra {
+  id        String   @id @default(uuid())
+  name      String
+  price     Float
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+}
+
+model Table {
+  id        String   @id @default(uuid())
+  number    String
+  capacity  Int
+  status    String   // free, occupied, reserved, maintenance
+  location  String
+  qrCode    String
+  // Sessão atual
+  currentSessionId String? @unique
+  currentSession   TableSession? @relation(fields: [currentSessionId], references: [id])
+  lastOrderId      String? @unique
+  lastOrder        Order?        @relation(fields: [lastOrderId], references: [id])
+  reservations     Reservation[]
+}
+
+model TableSession {
+  id        String   @id @default(uuid())
+  tableId   String?
+  table     Table?
+  startTime DateTime
+  people    Int
+  total     Float    @default(0)
+  closed    Boolean  @default(false)
+}
+
+model Reservation {
+  id           String   @id @default(uuid())
+  table        Table    @relation(fields: [tableId], references: [id])
+  tableId      String
+  reservedFor  DateTime
+  customerName String
+  people       Int
+  phone        String?
+  notes        String?
+  createdAt    DateTime @default(now())
+}
+
+model DeliveryArea {
+  id      String  @id @default(uuid())
+  name    String
+  cep     String
+  price   Float
+  active  Boolean @default(true)
+  deliveries Delivery[]
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  user        User?       @relation(fields: [userId], references: [id])
+  userId      String?
+  tableId     String?
+  table       Table?
+  status      String      // aguardando, preparando, finalizado, entregue, etc
+  total       Float
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  items       OrderItem[]
+  delivery    Delivery?   // se for delivery
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  order     Order    @relation(fields: [orderId], references: [id])
+  orderId   String
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  quantity  Int
+  price     Float
+  extras    String? // pode ser um JSON com os extras selecionados
+}
+
+model Delivery {
+  id              String   @id @default(uuid())
+  order           Order    @relation(fields: [orderId], references: [id])
+  orderId         String   @unique
+  address         String
+  deliveryAreaId  String?
+  deliveryArea    DeliveryArea? @relation(fields: [deliveryAreaId], references: [id])
+  status          String   // aguardando, em rota, entregue, etc
+  fee             Float
+  estimatedTime   String?
+  customerName    String
+  customerPhone   String
+}

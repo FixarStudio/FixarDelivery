@@ -53,12 +53,6 @@ const recentOrders = [
   { id: 3, table: "Mesa 8", items: "Salada Caesar, Suco", total: "R$ 28,50", time: "14:20", status: "delivered" },
 ]
 
-const products = [
-  { id: 1, name: "X-Burger Especial", category: "Burgers", price: "R$ 28,90", status: "active", orders: 24 },
-  { id: 2, name: "Pizza Margherita", category: "Pizzas", price: "R$ 45,90", status: "active", orders: 18 },
-  { id: 3, name: "Coca-Cola 350ml", category: "Bebidas", price: "R$ 6,50", status: "active", orders: 32 },
-]
-
 export default function AdminDashboard() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("dashboard")
@@ -67,7 +61,7 @@ export default function AdminDashboard() {
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<any>(null)
-  const [productsState, setProductsState] = useState<any[]>(products)
+  const [productsState, setProductsState] = useState<any[]>([])
   const [deletingProduct, setDeletingProduct] = useState<any>(null)
   const [successModal, setSuccessModal] = useState<{
     show: boolean
@@ -75,6 +69,19 @@ export default function AdminDashboard() {
     message: string
     product: any | null
   }>({ show: false, type: "", message: "", product: null })
+  const [loadingProducts, setLoadingProducts] = useState(false)
+
+  const fetchProducts = async () => {
+    setLoadingProducts(true)
+    const res = await fetch("/api/admin/products")
+    const data = await res.json()
+    setProductsState(data)
+    setLoadingProducts(false)
+  }
+
+  useEffect(() => {
+    fetchProducts()
+  }, [])
 
   // Estados para gerenciamento de mesas
   const [mesas, setMesas] = useState([
@@ -408,38 +415,28 @@ Frete: {frete}
     router.push("/admin/login")
   }
 
-  const handleAddProduct = (formData: any) => {
-    const newProduct = {
-      id: Date.now(),
-      name: formData.name,
-      category: formData.category,
-      price: `R$ ${Number.parseFloat(formData.price).toFixed(2)}`,
-      status: "active",
-      orders: 0,
-    }
-    setProductsState((prev) => [...prev, newProduct])
+  const handleAddProduct = async (formData: any) => {
+    await fetch("/api/admin/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    })
     setShowAddModal(false)
     setSuccessModal({
       show: true,
       type: "add",
       message: "Produto adicionado com sucesso!",
-      product: newProduct,
+      product: formData,
     })
+    fetchProducts()
   }
 
-  const handleEditProduct = (formData: any) => {
-    setProductsState((prev) =>
-      prev.map((p) =>
-        p.id === editingProduct.id
-          ? {
-              ...p,
-              name: formData.name,
-              category: formData.category,
-              price: `R$ ${Number.parseFloat(formData.price).toFixed(2)}`,
-            }
-          : p,
-      ),
-    )
+  const handleEditProduct = async (formData: any) => {
+    await fetch("/api/admin/products", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...formData, id: editingProduct.id }),
+    })
     setEditingProduct(null)
     setSuccessModal({
       show: true,
@@ -447,6 +444,23 @@ Frete: {frete}
       message: "Produto editado com sucesso!",
       product: editingProduct,
     })
+    fetchProducts()
+  }
+
+  const handleDeleteProduct = async (product: any) => {
+    await fetch("/api/admin/products", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: product.id }),
+    })
+    setDeletingProduct(null)
+    setSuccessModal({
+      show: true,
+      type: "delete",
+      message: "Produto excluído com sucesso!",
+      product: product,
+    })
+    fetchProducts()
   }
 
   // Funções para gerenciamento de mesas
@@ -528,22 +542,29 @@ Frete: {frete}
       mesas.map((mesa) => {
         if (mesa.id === mesaId) {
           const newStatus = mesa.status === "free" ? "occupied" : "free"
-          return {
-            ...mesa,
-            status: newStatus,
-            currentSession:
-              newStatus === "occupied"
-                ? {
-                    startTime: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-                    people: mesa.capacity,
-                    orders: 0,
-                    total: 0,
-                  }
-                : null,
+          if (newStatus === "occupied") {
+            return {
+              ...mesa,
+              status: newStatus,
+              currentSession: {
+                startTime: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                people: mesa.capacity,
+                orders: 0,
+                total: 0,
+              },
+              lastOrder: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+            }
+          } else {
+            return {
+              ...mesa,
+              status: newStatus,
+              currentSession: null,
+              lastOrder: null,
+            }
           }
         }
         return mesa
-      }),
+      })
     )
   }
 
@@ -2394,17 +2415,7 @@ Frete: {frete}
                       Cancelar
                     </Button>
                     <Button
-                      onClick={() => {
-                        setProductsState((prev) => prev.filter((p) => p.id !== deletingProduct.id))
-                        const deletedProduct = deletingProduct
-                        setDeletingProduct(null)
-                        setSuccessModal({
-                          show: true,
-                          type: "delete",
-                          message: "Produto excluído com sucesso!",
-                          product: deletedProduct,
-                        })
-                      }}
+                      onClick={() => handleDeleteProduct(deletingProduct)}
                       className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
