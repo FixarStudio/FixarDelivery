@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { motion, AnimatePresence, easeOut } from "framer-motion"
 import { Search, ShoppingCart, Moon, Sun, QrCode, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -36,32 +36,85 @@ export default function EstabelecimentoPage() {
     { id: "salads", name: "🥗 Saladas", count: 0 },
   ])
 
-  const [restaurantInfo] = useState({
+  const [restaurantInfo, setRestaurantInfo] = useState({
     name: "Restaurante Premium",
     logo: "/placeholder.svg?height=60&width=120",
     table: "Mesa 12",
     area: "Salão Principal",
   })
 
+  const [customization, setCustomization] = useState({
+    primaryColor: "#ea580c",
+    secondaryColor: "#fb923c",
+    accentColor: "#fed7aa",
+    restaurantLogo: null,
+  })
+
+  // Buscar configurações do restaurante
+  useEffect(() => {
+    const loadRestaurantConfig = async () => {
+      try {
+        console.log("Carregando configurações do restaurante...")
+        const response = await fetch("/api/customization", {
+          cache: 'no-store' // Forçar sempre buscar dados frescos
+        })
+        console.log("Status da resposta:", response.status)
+        
+        if (response.ok) {
+          const config = await response.json()
+          console.log("Configurações carregadas:", config)
+          
+          const newName = config.restaurantName || "Restaurante Premium"
+          console.log("Definindo nome do restaurante como:", newName)
+          setRestaurantInfo(prev => ({
+            ...prev,
+            name: newName
+          }))
+          setCustomization({
+            primaryColor: config.primaryColor || "#ea580c",
+            secondaryColor: config.secondaryColor || "#fb923c",
+            accentColor: config.accentColor || "#fed7aa",
+            restaurantLogo: config.restaurantLogo || null,
+          })
+          
+          console.log("Nome do restaurante definido como:", config.restaurantName)
+        } else {
+          console.error("Erro na resposta da API:", response.status)
+        }
+      } catch (error) {
+        console.error("Erro ao carregar configurações do restaurante:", error)
+      }
+    }
+    
+    loadRestaurantConfig()
+  }, [])
+
   // Detectar mesa pela URL e localStorage
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    console.log("Detectando mesa...")
     const urlParams = new URLSearchParams(window.location.search)
     const mesa = urlParams.get("mesa")
     const savedMesa = localStorage.getItem("currentTable")
     
-
+    console.log("Mesa da URL:", mesa)
+    console.log("Mesa salva:", savedMesa)
     
     if (mesa) {
+      console.log("Usando mesa da URL:", mesa)
       setCurrentTable(mesa)
       localStorage.setItem("currentTable", mesa)
       setShowMesaSelector(false)
     } else if (savedMesa) {
+      console.log("Usando mesa salva:", savedMesa)
       setCurrentTable(savedMesa)
       setShowMesaSelector(false)
       // Atualizar URL sem recarregar a página
       const newUrl = `${window.location.pathname}?mesa=${savedMesa}`
       window.history.pushState({}, "", newUrl)
     } else {
+      console.log("Nenhuma mesa encontrada, mostrando seletor")
       setShowMesaSelector(true)
     }
   }, [])
@@ -101,9 +154,78 @@ export default function EstabelecimentoPage() {
     },
   }
 
+  // Memoizar fetchProducts para evitar re-criação
+  const fetchProductsMemo = useCallback(async () => {
+    try {
+      console.log("=== INICIANDO BUSCA DE PRODUTOS ===")
+      console.log("Mesa atual na função:", currentTable)
+      setLoadingProducts(true)
+      
+      const response = await fetch('/api/admin/products')
+      console.log("Status da resposta de produtos:", response.status)
+      
+      if (response.ok) {
+        const productsData = await response.json()
+        console.log("Produtos recebidos:", productsData.length)
+        console.log("Primeiro produto:", productsData[0])
+        
+        // Adicionar dados mockados para campos que não existem no banco
+        const enhancedProducts = productsData.map((product: any) => ({
+          ...product,
+          rating: 4.5 + Math.random() * 0.5, // Rating entre 4.5 e 5.0
+          reviews: Math.floor(Math.random() * 200) + 50, // Reviews entre 50 e 250
+          badges: product.available ? ["Disponível"] : ["Indisponível"],
+          preparationTime: product.preparationTime || (product.category === "drinks" ? "Imediato" : "15-20 min"),
+        }))
+        
+        console.log("Produtos processados:", enhancedProducts.length)
+        setProducts(enhancedProducts)
+        
+        // Salvar produtos no localStorage para esta mesa
+        if (currentTable) {
+          // Adicionar timestamp aos produtos
+          const productsWithTimestamp = enhancedProducts.map((product: any) => ({
+            ...product,
+            _timestamp: Date.now()
+          }))
+          localStorage.setItem(`products_${currentTable}`, JSON.stringify(productsWithTimestamp))
+          console.log("Produtos salvos no localStorage para mesa:", currentTable)
+          console.log("Quantidade de produtos salvos:", productsWithTimestamp.length)
+        } else {
+          console.log("ERRO: currentTable é null, não salvando produtos")
+        }
+        
+        // Atualizar contadores das categorias
+        const categoryCounts = enhancedProducts.reduce((acc: any, product: any) => {
+          acc[product.category] = (acc[product.category] || 0) + 1
+          return acc
+        }, {})
+        
+        setCategories(prev => prev.map(cat => ({
+          ...cat,
+          count: cat.id === "all" ? enhancedProducts.length : (categoryCounts[cat.id] || 0)
+        })))
+        
+        console.log("Estado de produtos atualizado")
+      } else {
+        console.error('Erro ao buscar produtos:', response.status)
+      }
+    } catch (error) {
+      console.error('Erro ao buscar produtos:', error)
+    } finally {
+      setLoadingProducts(false)
+      console.log("Busca de produtos finalizada")
+    }
+  }, [])
+
   // Filtrar produtos
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
+    console.log("Filtrando produtos...")
+    console.log("Total de produtos:", products.length)
+    console.log("Categoria selecionada:", selectedCategory)
+    console.log("Busca:", searchQuery)
+    
+    const filtered = products.filter((product) => {
       const matchesSearch =
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -111,6 +233,9 @@ export default function EstabelecimentoPage() {
       
       return matchesSearch && matchesCategory
     })
+    
+    console.log("Produtos filtrados:", filtered.length)
+    return filtered
   }, [products, searchQuery, selectedCategory])
   
 
@@ -128,52 +253,51 @@ export default function EstabelecimentoPage() {
     })
   }
 
-  // Função para buscar produtos do banco de dados
-  const fetchProducts = async () => {
-    try {
-      setLoadingProducts(true)
-      
-      const response = await fetch('/api/admin/products')
-      
-      if (response.ok) {
-        const productsData = await response.json()
-        
-        // Adicionar dados mockados para campos que não existem no banco
-        const enhancedProducts = productsData.map((product: any) => ({
-          ...product,
-          rating: 4.5 + Math.random() * 0.5, // Rating entre 4.5 e 5.0
-          reviews: Math.floor(Math.random() * 200) + 50, // Reviews entre 50 e 250
-          badges: product.available ? ["Disponível"] : ["Indisponível"],
-          preparationTime: product.preparationTime || (product.category === "drinks" ? "Imediato" : "15-20 min"),
-        }))
-        
-        setProducts(enhancedProducts)
-        
-        // Atualizar contadores das categorias
-        const categoryCounts = enhancedProducts.reduce((acc: any, product: any) => {
-          acc[product.category] = (acc[product.category] || 0) + 1
-          return acc
-        }, {})
-        
-        setCategories(prev => prev.map(cat => ({
-          ...cat,
-          count: cat.id === "all" ? enhancedProducts.length : (categoryCounts[cat.id] || 0)
-        })))
-      } else {
-        console.error('Erro ao buscar produtos:', response.status)
-      }
-    } catch (error) {
-      console.error('Erro ao buscar produtos:', error)
-    } finally {
-      setLoadingProducts(false)
-    }
-  }
+
 
   // Buscar produtos quando uma mesa estiver selecionada
   useEffect(() => {
+    console.log("=== useEffect PRODUTOS ===")
+    console.log("Mesa atual:", currentTable)
+    console.log("Loading products:", loadingProducts)
+    
     if (currentTable) {
-      fetchProducts()
+      console.log("Mesa selecionada, verificando localStorage...")
+      
+      // Verificar se já temos produtos salvos para esta mesa
+      const savedProducts = typeof window !== 'undefined' ? localStorage.getItem(`products_${currentTable}`) : null
+      console.log("Produtos salvos encontrados:", !!savedProducts)
+      
+      if (savedProducts) {
+        try {
+          console.log("Carregando produtos salvos do localStorage")
+          const parsedProducts = JSON.parse(savedProducts)
+          console.log("Produtos carregados:", parsedProducts.length)
+          setProducts(parsedProducts)
+          
+          // Atualizar contadores das categorias
+          const categoryCounts = parsedProducts.reduce((acc: any, product: any) => {
+            acc[product.category] = (acc[product.category] || 0) + 1
+            return acc
+          }, {})
+          
+          setCategories(prev => prev.map(cat => ({
+            ...cat,
+            count: cat.id === "all" ? parsedProducts.length : (categoryCounts[cat.id] || 0)
+          })))
+          
+          console.log("Produtos carregados com sucesso do localStorage")
+        } catch (error) {
+          console.error("Erro ao carregar produtos do localStorage:", error)
+          console.log("Buscando produtos do servidor...")
+          fetchProductsMemo()
+        }
+      } else {
+        console.log("Nenhum produto salvo, buscando do servidor...")
+        fetchProductsMemo()
+      }
     } else {
+      console.log("Nenhuma mesa selecionada, limpando produtos")
       setProducts([])
     }
   }, [currentTable])
@@ -185,6 +309,8 @@ export default function EstabelecimentoPage() {
 
   // Adicionar listener para liberar mesa ao sair da página
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    
     const handleBeforeUnload = () => {
       // Só liberar se não estiver na página de admin
       if (!window.location.pathname.includes('/admin')) {
@@ -241,18 +367,46 @@ export default function EstabelecimentoPage() {
   const cartTotal = cart.reduce((total, item) => total + item.price * item.quantity, 0)
   const cartItemsCount = cart.reduce((total, item) => total + item.quantity, 0)
 
+  // Aplicar tema sem causar re-renderizações desnecessárias
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    const root = document.documentElement
     if (isDark) {
-      document.documentElement.classList.add("dark")
+      root.classList.add("dark")
     } else {
-      document.documentElement.classList.remove("dark")
+      root.classList.remove("dark")
     }
   }, [isDark])
 
+  // Limpar produtos antigos do localStorage (manter apenas 24h)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    const now = Date.now()
+    const oneDay = 24 * 60 * 60 * 1000 // 24 horas em millisegundos
+    
+    // Limpar produtos salvos há mais de 24h
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('products_')) {
+        try {
+          const products = JSON.parse(localStorage.getItem(key) || '[]')
+          if (products.length > 0 && products[0]._timestamp) {
+            if (now - products[0]._timestamp > oneDay) {
+              localStorage.removeItem(key)
+              console.log('Produtos antigos removidos:', key)
+            }
+          }
+        } catch (error) {
+          // Se não conseguir parsear, remover a chave
+          localStorage.removeItem(key)
+        }
+      }
+    })
+  }, [])
+
   return (
-    <div
-      className={`min-h-screen transition-colors duration-300 ${isDark ? "dark bg-gray-900" : "bg-gradient-to-br from-orange-50 to-red-50"}`}
-    >
+    <div className={`min-h-screen transition-colors duration-300 ${isDark ? "dark bg-gray-900" : "bg-gradient-to-br from-orange-50 to-red-50"}`}>
       {/* Header Premium */}
       <motion.header
         initial={{ y: -100, opacity: 0 }}
@@ -263,12 +417,17 @@ export default function EstabelecimentoPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <img
-                src={restaurantInfo.logo || "/placeholder.svg"}
+                src={customization.restaurantLogo || restaurantInfo.logo || "/placeholder.svg"}
                 alt="Logo"
                 className="h-10 w-auto rounded-lg shadow-sm"
               />
               <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">{restaurantInfo.name}</h1>
+                <h1 
+                  className="text-xl font-bold text-gray-900 dark:text-white"
+                  style={{ color: customization.primaryColor }}
+                >
+                  {restaurantInfo.name}
+                </h1>
                 <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                   {currentTable ? (
                     <>
@@ -292,6 +451,10 @@ export default function EstabelecimentoPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  style={{ 
+                    borderColor: customization.primaryColor,
+                    color: customization.primaryColor
+                  }}
                   onClick={async () => {
                     // Liberar mesa atual se existir
                     if (currentTable) {
@@ -333,6 +496,10 @@ export default function EstabelecimentoPage() {
                     // Limpar mesa atual
                     setCurrentTable(null)
                     localStorage.removeItem("currentTable")
+                    // Limpar produtos da mesa anterior
+                    if (currentTable) {
+                      localStorage.removeItem(`products_${currentTable}`)
+                    }
                     // Limpar URL
                     window.history.pushState({}, "", window.location.pathname)
                   }}
@@ -378,8 +545,11 @@ export default function EstabelecimentoPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setIsSearchExpanded(true)}
                 onBlur={() => setIsSearchExpanded(false)}
+                style={{
+                  '--ring-color': customization.primaryColor
+                } as React.CSSProperties}
                 className={`pl-10 transition-all duration-300 ${
-                  isSearchExpanded ? "ring-2 ring-orange-500 shadow-lg" : ""
+                  isSearchExpanded ? "ring-2 shadow-lg" : ""
                 } bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm`}
               />
             </div>
@@ -396,11 +566,17 @@ export default function EstabelecimentoPage() {
               categories={categories}
               selectedCategory={selectedCategory}
               onCategoryChange={setSelectedCategory}
+              customization={customization}
             />
           </motion.div>
 
           {/* Products Grid */}
           <div className="container mx-auto px-4 pb-24">
+            <div className="text-center py-2 text-xs text-gray-500 bg-yellow-100 p-2 rounded mb-4">
+              Debug: Mesa {currentTable} | Loading: {loadingProducts.toString()} | Produtos: {products.length} | Filtrados: {filteredProducts.length}
+              <br />
+              localStorage: {typeof window !== 'undefined' && localStorage.getItem(`products_${currentTable}`) ? 'Sim' : 'Não'}
+            </div>
             {!currentTable ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
                 <div className="text-6xl mb-4">🪑</div>
@@ -413,14 +589,6 @@ export default function EstabelecimentoPage() {
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Carregando produtos...</h3>
                 <p className="text-gray-600 dark:text-gray-400">Aguarde enquanto buscamos os produtos disponíveis</p>
               </motion.div>
-            ) : products.length === 0 ? (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
-                <div className="text-6xl mb-4">📦</div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Nenhum produto disponível</h3>
-                <p className="text-gray-400">Não há produtos cadastrados no momento</p>
-                <p className="text-sm text-gray-500 mt-2">Mesa: {currentTable} | Produtos: {products.length}</p>
-
-              </motion.div>
             ) : (
               <>
                 <motion.div
@@ -432,7 +600,11 @@ export default function EstabelecimentoPage() {
                   <AnimatePresence>
                     {filteredProducts.map((product) => (
                       <motion.div key={product.id} variants={itemVariants} layout exit={{ opacity: 0, scale: 0.8 }}>
-                        <ProductCard product={product} onAddToCart={addToCart} />
+                        <ProductCard 
+                          product={product} 
+                          onAddToCart={addToCart} 
+                          customization={customization}
+                        />
                       </motion.div>
                     ))}
                   </AnimatePresence>
@@ -460,10 +632,14 @@ export default function EstabelecimentoPage() {
             exit={{ y: 100, opacity: 0 }}
             className="fixed bottom-6 left-4 right-4 z-50"
           >
-            <Button
-              onClick={() => setIsCartOpen(true)}
-              className="w-full h-14 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold text-lg shadow-2xl rounded-2xl relative overflow-hidden group"
-            >
+                          <Button
+                onClick={() => setIsCartOpen(true)}
+                style={{
+                  background: `linear-gradient(135deg, ${customization.primaryColor}, ${customization.secondaryColor})`,
+                  borderColor: customization.primaryColor
+                }}
+                className="w-full h-14 text-white font-semibold text-lg shadow-2xl rounded-2xl relative overflow-hidden group hover:opacity-90 transition-opacity"
+              >
               <div className="absolute inset-0 bg-white/20 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
               <div className="flex items-center justify-between w-full relative z-10">
                 <div className="flex items-center space-x-2">

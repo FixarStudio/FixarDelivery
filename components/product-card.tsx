@@ -11,9 +11,13 @@ interface ProductCardProps {
   product: any
   onAddToCart: (product: any, quantity?: number) => void
   isDelivery?: boolean
+  customization?: {
+    primaryColor: string
+    secondaryColor: string
+  }
 }
 
-export function ProductCard({ product, onAddToCart, isDelivery = false }: ProductCardProps) {
+export function ProductCard({ product, onAddToCart, isDelivery = false, customization }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false)
 
   return (
@@ -33,7 +37,12 @@ export function ProductCard({ product, onAddToCart, isDelivery = false }: Produc
           {product.badges && product.badges.length > 0 && (
             <div className="absolute top-3 left-3 flex flex-wrap gap-1">
               {product.badges.map((badge: string, index: number) => (
-                <Badge key={index} variant="secondary" className="bg-orange-500 text-white text-xs px-2 py-1">
+                <Badge 
+                  key={index} 
+                  variant="secondary" 
+                  className="text-white text-xs px-2 py-1"
+                  style={{ backgroundColor: customization?.primaryColor || '#ea580c' }}
+                >
                   {badge}
                 </Badge>
               ))}
@@ -43,7 +52,11 @@ export function ProductCard({ product, onAddToCart, isDelivery = false }: Produc
           {/* Availability indicator */}
           {!product.available && (
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <Badge variant="destructive" className="text-sm">
+              <Badge 
+                variant="destructive" 
+                className="text-sm"
+                style={{ backgroundColor: customization?.primaryColor || '#ea580c' }}
+              >
                 Indisponível
               </Badge>
             </div>
@@ -76,7 +89,12 @@ export function ProductCard({ product, onAddToCart, isDelivery = false }: Produc
           {/* Price and add button */}
           <div className="flex items-center justify-between pt-2">
             <div className="space-y-1">
-              <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">R$ {product.price.toFixed(2)}</p>
+              <p 
+                className="text-2xl font-bold"
+                style={{ color: customization?.primaryColor || '#ea580c' }}
+              >
+                R$ {product.price.toFixed(2)}
+              </p>
               {isDelivery && product.extras && product.extras.length > 0 && (
                 <p className="text-xs text-gray-500">+ extras disponíveis</p>
               )}
@@ -86,7 +104,11 @@ export function ProductCard({ product, onAddToCart, isDelivery = false }: Produc
               <Button
                 onClick={() => onAddToCart(product)}
                 disabled={!product.available}
-                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold px-4 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: `linear-gradient(135deg, ${customization?.primaryColor || '#ea580c'}, ${customization?.secondaryColor || '#fb923c'})`,
+                  borderColor: customization?.primaryColor || '#ea580c'
+                }}
+                className="text-white font-semibold px-4 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
               >
                 {isDelivery && product.extras && product.extras.length > 0 ? (
                   <>

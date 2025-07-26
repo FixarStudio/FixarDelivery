@@ -132,3 +132,10 @@ model Delivery {
   customerName    String
   customerPhone   String
 }
+
+model Customization {
+  id        Int      @id @default(autoincrement())
+  settings  Json     // Configurações de identidade visual
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

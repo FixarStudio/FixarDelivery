@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { ThemePreview } from "@/components/theme-preview"
 
 const statsData = [
   { title: "Pedidos Hoje", value: "47", change: "+12%", icon: Package, color: "text-blue-600" },
@@ -239,6 +240,7 @@ Frete: {frete}
 
   const [customization, setCustomization] = useState({
     restaurantName: "Restaurante Premium",
+    restaurantLogo: null,
     tagline: "",
     primaryColor: "#ea580c",
     secondaryColor: "#fb923c",
@@ -261,15 +263,31 @@ Frete: {frete}
     customCursor: false,
   })
 
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+
   // Carregar customização salva ao inicializar
   useEffect(() => {
-    const savedCustomization = localStorage.getItem("restaurant_customization")
-    if (savedCustomization) {
-      const parsed = JSON.parse(savedCustomization)
-      setCustomization(parsed)
-      applyThemeToDocument(parsed)
+    const loadCustomization = async () => {
+      try {
+        const response = await fetch("/api/admin/customization")
+        if (response.ok) {
+          const settings = await response.json()
+          setCustomization(settings)
+          applyThemeToDocument(settings)
+        }
+      } catch (error) {
+        console.error("Erro ao carregar customização:", error)
+      }
     }
+    
+    loadCustomization()
   }, [])
+
+  // Aplicar mudanças em tempo real
+  useEffect(() => {
+    applyThemeToDocument(customization)
+  }, [customization])
 
   const applyThemeToDocument = (theme: typeof customization) => {
     const root = document.documentElement
@@ -350,24 +368,45 @@ Frete: {frete}
     }
   }
 
-  const applyCustomization = () => {
-    // Aplicar tema ao documento
-    applyThemeToDocument(customization)
+  const applyCustomization = async () => {
+    try {
+      // Salvar no banco de dados
+      const response = await fetch("/api/admin/customization", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(customization),
+      })
 
-    // Salvar no localStorage
-    localStorage.setItem("restaurant_customization", JSON.stringify(customization))
+      if (response.ok) {
+        // Aplicar tema ao documento
+        applyThemeToDocument(customization)
 
-    setSuccessModal({
-      show: true,
-      type: "customization",
-      message: "Personalização aplicada com sucesso!",
-      product: null,
-    })
+        setSuccessModal({
+          show: true,
+          type: "customization",
+          message: "Personalização aplicada com sucesso!",
+          product: null,
+        })
+      } else {
+        throw new Error("Erro ao salvar customização")
+      }
+    } catch (error) {
+      console.error("Erro ao aplicar customização:", error)
+      setSuccessModal({
+        show: true,
+        type: "error",
+        message: "Erro ao aplicar personalização",
+        product: null,
+      })
+    }
   }
 
-  const resetCustomization = () => {
+  const resetCustomization = async () => {
     const defaultTheme = {
       restaurantName: "Restaurante Premium",
+      restaurantLogo: null,
       tagline: "",
       primaryColor: "#ea580c",
       secondaryColor: "#fb923c",
@@ -390,9 +429,38 @@ Frete: {frete}
       customCursor: false,
     }
 
-    setCustomization(defaultTheme)
-    applyThemeToDocument(defaultTheme)
-    localStorage.removeItem("restaurant_customization")
+    try {
+      // Salvar tema padrão no banco
+      const response = await fetch("/api/admin/customization", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(defaultTheme),
+      })
+
+      if (response.ok) {
+        setCustomization(defaultTheme)
+        applyThemeToDocument(defaultTheme)
+        
+        setSuccessModal({
+          show: true,
+          type: "customization",
+          message: "Personalização resetada com sucesso!",
+          product: null,
+        })
+      } else {
+        throw new Error("Erro ao resetar customização")
+      }
+    } catch (error) {
+      console.error("Erro ao resetar customização:", error)
+      setSuccessModal({
+        show: true,
+        type: "error",
+        message: "Erro ao resetar personalização",
+        product: null,
+      })
+    }
   }
 
   const exportTheme = () => {
@@ -412,6 +480,49 @@ Frete: {frete}
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+  }
+
+  const handleLogoUpload = async () => {
+    if (!logoFile) {
+      alert("Selecione um arquivo primeiro")
+      return
+    }
+
+    try {
+      setUploadingLogo(true)
+      const formData = new FormData()
+      formData.append("logo", logoFile)
+
+      const response = await fetch("/api/admin/logo", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setCustomization(prev => ({
+          ...prev,
+          restaurantLogo: result.logoUrl
+        }))
+        
+        setSuccessModal({
+          show: true,
+          type: "logo",
+          message: "Logo do restaurante atualizada com sucesso!",
+          product: null,
+        })
+        
+        setLogoFile(null)
+      } else {
+        const error = await response.json()
+        alert(`Erro ao fazer upload: ${error.error}`)
+      }
+    } catch (error) {
+      console.error("Erro ao fazer upload da logo:", error)
+      alert("Erro ao fazer upload da logo")
+    } finally {
+      setUploadingLogo(false)
+    }
   }
 
   // Verificar autenticação ao carregar a página
@@ -1919,7 +2030,33 @@ Frete: {frete}
                         </div>
                         <div>
                           <Label htmlFor="logo-upload">Logo do Restaurante</Label>
-                          <Input id="logo-upload" type="file" accept="image/*" />
+                          <div className="space-y-2">
+                            {customization.restaurantLogo && (
+                              <div className="flex items-center space-x-2">
+                                <img 
+                                  src={customization.restaurantLogo} 
+                                  alt="Logo atual" 
+                                  className="h-12 w-12 rounded-lg object-cover"
+                                />
+                                <span className="text-sm text-gray-600">Logo atual</span>
+                              </div>
+                            )}
+                            <div className="flex space-x-2">
+                              <Input 
+                                id="logo-upload" 
+                                type="file" 
+                                accept="image/*"
+                                onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
+                              />
+                              <Button 
+                                onClick={handleLogoUpload}
+                                disabled={!logoFile || uploadingLogo}
+                                size="sm"
+                              >
+                                {uploadingLogo ? "Enviando..." : "Enviar"}
+                              </Button>
+                            </div>
+                          </div>
                         </div>
                         <div>
                           <Label htmlFor="tagline">Slogan/Tagline</Label>
@@ -2286,150 +2423,7 @@ Frete: {frete}
               {/* Right Column - Live Preview + Ações rápidas */}
               <div className="space-y-6">
                 {/* Preview em Tempo Real */}
-                <div>
-                  <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
-                    <CardHeader>
-                      <CardTitle className="flex items-center space-x-2">
-                        <Eye className="h-5 w-5" />
-                        <span>Preview em Tempo Real</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div
-                        className="p-4 rounded-lg border-2 min-h-[400px] transition-all duration-300"
-                        style={{
-                          borderRadius: `${customization.borderRadius}px`,
-                          fontFamily: customization.primaryFont,
-                          fontSize: `${customization.fontSize}px`,
-                          fontWeight: customization.fontWeight,
-                          background:
-                            customization.backgroundType === "gradient"
-                              ? `linear-gradient(135deg, ${customization.primaryColor}20, ${customization.secondaryColor}20)`
-                              : customization.backgroundType === "solid"
-                                ? `${customization.accentColor}40`
-                                : "linear-gradient(135deg, #f3f4f6, #e5e7eb)",
-                          backdropFilter: customization.backdropBlur ? "blur(10px)" : "none",
-                        }}
-                      >
-                        {/* Header Preview */}
-                        <div
-                          className="mb-4 p-3 rounded-lg shadow-sm"
-                          style={{
-                            backgroundColor: customization.primaryColor + "10",
-                            borderRadius: `${customization.borderRadius * 0.75}px`,
-                            boxShadow:
-                              customization.shadowIntensity > 0
-                                ? `0 ${customization.shadowIntensity}px ${customization.shadowIntensity * 2}px rgba(0,0,0,0.1)`
-                                : "none",
-                          }}
-                        >
-                          <h3
-                            className="font-bold text-lg mb-1"
-                            style={{
-                              color: customization.primaryColor,
-                              fontFamily: customization.primaryFont,
-                            }}
-                          >
-                            {customization.restaurantName || "Restaurante Premium"}
-                          </h3>
-                          {customization.tagline && (
-                            <p
-                              className="text-sm opacity-80"
-                              style={{
-                                fontFamily: customization.secondaryFont,
-                                fontSize: `${customization.fontSize - 2}px`,
-                              }}
-                            >
-                              {customization.tagline}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Product Card Preview */}
-                        <div
-                          className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm mb-3 transition-all duration-300 hover:scale-105"
-                          style={{
-                            borderRadius: `${customization.borderRadius * 0.75}px`,
-                            boxShadow:
-                              customization.shadowIntensity > 0
-                                ? `0 ${customization.shadowIntensity}px ${customization.shadowIntensity * 2}px rgba(0,0,0,0.1)`
-                                : "none",
-                            transform: customization.animations === "dynamic" ? "translateY(0)" : "none",
-                          }}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div
-                              className="w-12 h-12 rounded-lg"
-                              style={{
-                                backgroundColor: customization.accentColor,
-                                borderRadius: `${customization.borderRadius * 0.5}px`,
-                              }}
-                            />
-                            <div className="flex-1">
-                              <h4
-                                className="font-semibold"
-                                style={{
-                                  fontFamily: customization.primaryFont,
-                                  fontSize: `${customization.fontSize}px`,
-                                  fontWeight: customization.fontWeight,
-                                }}
-                              >
-                                Produto Exemplo
-                              </h4>
-                              <p
-                                className="text-sm opacity-70"
-                                style={{
-                                  fontFamily: customization.secondaryFont,
-                                  fontSize: `${customization.fontSize - 2}px`,
-                                }}
-                              >
-                                Descrição do produto
-                              </p>
-                            </div>
-                            <div className="font-bold" style={{ color: customization.primaryColor }}>
-                              R$ 25,90
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Button Preview */}
-                        <button
-                          className="w-full py-2 px-4 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-105"
-                          style={{
-                            background: `linear-gradient(135deg, ${customization.primaryColor}, ${customization.secondaryColor})`,
-                            borderRadius: `${customization.borderRadius * 0.5}px`,
-                            fontFamily: customization.primaryFont,
-                            fontSize: `${customization.fontSize}px`,
-                            boxShadow:
-                              customization.shadowIntensity > 0
-                                ? `0 ${customization.shadowIntensity}px ${customization.shadowIntensity * 2}px rgba(0,0,0,0.2)`
-                                : "none",
-                          }}
-                        >
-                          Adicionar ao Carrinho
-                        </button>
-
-                        {/* Style Info */}
-                        <div className="mt-4 p-2 bg-gray-100 dark:bg-gray-700 rounded text-xs">
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                              <strong>Fonte:</strong> {customization.primaryFont}
-                            </div>
-                            <div>
-                              <strong>Tamanho:</strong> {customization.fontSize}px
-                            </div>
-                            <div>
-                              <strong>Estilo:</strong> {customization.cardStyle}
-                            </div>
-                            <div>
-                              <strong>Bordas:</strong> {customization.borderRadius}px
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                <ThemePreview customization={customization} />
                 {/* Ações rápidas */}
                 <Card className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-0 shadow-2xl">
                   <CardHeader className="pb-3">
