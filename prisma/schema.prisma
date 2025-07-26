@@ -25,25 +25,19 @@ model User {
   orders    Order[]
 }
 
-model Category {
-  id        String    @id @default(uuid())
-  name      String    @unique
-  products  Product[]
-}
-
 model Product {
-  id          String     @id @default(uuid())
-  name        String
-  description String
-  price       Float
-  image       String?
-  available   Boolean    @default(true)
-  categoryId  String
-  category    Category  @relation(fields: [categoryId], references: [id])
-  orders      OrderItem[]
-  extras      Extra[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id              String     @id @default(uuid())
+  name            String
+  description     String
+  price           Float
+  image           String?
+  available       Boolean    @default(true)
+  category        String
+  preparationTime String?    @default("15-20 min")
+  orders          OrderItem[]
+  extras          Extra[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 }
 
 model Extra {

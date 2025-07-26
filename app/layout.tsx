@@ -9,10 +9,16 @@ export const metadata: Metadata = {
   title: "Cardápio Digital Premium",
   description: "Cardápio digital interativo com integração WhatsApp e personalização avançada",
   manifest: "/manifest.json",
-  themeColor: "#ea580c",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
+
+export const viewport = {
+  themeColor: "#ea580c",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: "no"
+};
 
 export default function RootLayout({
   children,

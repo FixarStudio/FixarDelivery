@@ -23,58 +23,7 @@ const categories = [
   { id: "salads", name: "🥗 Saladas", count: 5 },
 ]
 
-const products = [
-  {
-    id: 1,
-    name: "X-Burger Especial",
-    description: "Hambúrguer artesanal 180g, queijo cheddar, bacon, alface, tomate e molho especial",
-    price: 28.9,
-    image: "/placeholder.svg?height=200&width=300",
-    category: "burgers",
-    rating: 4.8,
-    reviews: 124,
-    badges: ["Mais Pedido", "Premium"],
-    preparationTime: "15-20 min",
-    available: true,
-    extras: [
-      { id: 1, name: "Bacon Extra", price: 3.5 },
-      { id: 2, name: "Queijo Extra", price: 2.5 },
-      { id: 3, name: "Cebola Caramelizada", price: 2.0 },
-    ],
-  },
-  {
-    id: 2,
-    name: "Pizza Margherita",
-    description: "Molho de tomate, mussarela de búfala, manjericão fresco e azeite extravirgem",
-    price: 45.9,
-    image: "/placeholder.svg?height=200&width=300",
-    category: "pizzas",
-    rating: 4.9,
-    reviews: 89,
-    badges: ["Vegetariano", "Novo"],
-    preparationTime: "25-30 min",
-    available: true,
-    extras: [
-      { id: 4, name: "Borda Recheada", price: 8.0 },
-      { id: 5, name: "Azeitona Extra", price: 3.0 },
-      { id: 6, name: "Rúcula", price: 4.0 },
-    ],
-  },
-  {
-    id: 3,
-    name: "Coca-Cola 350ml",
-    description: "Refrigerante gelado servido na garrafa",
-    price: 6.5,
-    image: "/placeholder.svg?height=200&width=300",
-    category: "drinks",
-    rating: 4.5,
-    reviews: 256,
-    badges: [],
-    preparationTime: "Imediato",
-    available: true,
-    extras: [],
-  },
-]
+// Produtos serão carregados do banco de dados
 
 const deliveryConfig = {
   freeShippingMinimum: 50.0,
@@ -95,6 +44,8 @@ export default function DeliveryPage() {
   const [deliveryTime, setDeliveryTime] = useState(30)
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const [selectedExtras, setSelectedExtras] = useState<number[]>([])
+  const [products, setProducts] = useState<any[]>([])
+  const [loadingProducts, setLoadingProducts] = useState(true)
 
   const [restaurantInfo] = useState({
     name: "Restaurante Premium",
@@ -102,6 +53,31 @@ export default function DeliveryPage() {
     phone: "5511999999999",
     address: "Rua Principal, 123 - Centro",
   })
+
+  const fetchProducts = async () => {
+    try {
+      setLoadingProducts(true)
+      const response = await fetch('/api/admin/products')
+      if (response.ok) {
+        const productsData = await response.json()
+        
+        // Adicionar dados mockados para campos que não existem no banco
+        const enhancedProducts = productsData.map((product: any) => ({
+          ...product,
+          rating: 4.5 + Math.random() * 0.5, // Rating entre 4.5 e 5.0
+          reviews: Math.floor(Math.random() * 200) + 50, // Reviews entre 50 e 250
+          badges: product.available ? ["Disponível"] : ["Indisponível"],
+          preparationTime: product.preparationTime || (product.category === "drinks" ? "Imediato" : "15-20 min"),
+        }))
+        
+        setProducts(enhancedProducts)
+      }
+    } catch (error) {
+      console.error('Erro ao buscar produtos:', error)
+    } finally {
+      setLoadingProducts(false)
+    }
+  }
 
   // Filtrar produtos
   const filteredProducts = products.filter((product) => {
@@ -164,6 +140,11 @@ export default function DeliveryPage() {
       document.documentElement.classList.remove("dark")
     }
   }, [isDark])
+
+  // Buscar produtos ao carregar a página
+  useEffect(() => {
+    fetchProducts()
+  }, [])
 
   return (
     <div
@@ -396,9 +377,12 @@ export default function DeliveryPage() {
               </div>
 
               <img
-                src={selectedProduct.image || "/placeholder.svg"}
+                src={selectedProduct.image ? `https://ik.imagekit.io/fixarmenu/${selectedProduct.image}` : "/placeholder.svg"}
                 alt={selectedProduct.name}
                 className="w-full h-48 object-cover rounded-lg mb-4"
+                onError={(e) => {
+                  e.currentTarget.src = "/placeholder.svg";
+                }}
               />
 
               <p className="text-gray-600 dark:text-gray-400 mb-4">{selectedProduct.description}</p>
@@ -469,12 +453,9 @@ export default function DeliveryPage() {
         onClose={() => setIsCartOpen(false)}
         cart={cart}
         setCart={setCart}
-        address={address}
-        shippingCost={finalShippingCost}
-        deliveryTime={deliveryTime}
-        restaurantInfo={restaurantInfo}
-        subtotal={subtotal}
-        total={total}
+        deliveryAddress={address}
+        deliveryFee={finalShippingCost}
+        estimatedTime={`${deliveryTime} minutos`}
       />
     </div>
   )

@@ -21,9 +21,12 @@ export function ProductCard({ product, onAddToCart, isDelivery = false }: Produc
       <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden group">
         <div className="relative">
           <img
-            src={product.image || "/placeholder.svg"}
+            src={product.image ? `https://ik.imagekit.io/fixarmenu/${product.image}` : "/placeholder.svg"}
             alt={product.name}
             className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={(e) => {
+              e.currentTarget.src = "/placeholder.svg";
+            }}
           />
 
           {/* Badges */}
@@ -62,20 +65,13 @@ export function ProductCard({ product, onAddToCart, isDelivery = false }: Produc
             <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{product.description}</p>
           </div>
 
-          {/* Rating and reviews */}
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1">
-              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-              <span className="text-sm font-medium text-gray-900 dark:text-white">{product.rating}</span>
-            </div>
-            <span className="text-sm text-gray-500">({product.reviews} avaliações)</span>
-          </div>
 
-          {/* Preparation time */}
-          <div className="flex items-center space-x-1 text-sm text-gray-600 dark:text-gray-400">
-            <Clock className="h-4 w-4" />
-            <span>{product.preparationTime}</span>
-          </div>
+
+                      {/* Preparation time */}
+            <div className="flex items-center space-x-1 text-sm text-gray-600 dark:text-gray-400">
+              <Clock className="h-4 w-4" />
+              <span>{product.preparationTime || "15-20 min"}</span>
+            </div>
 
           {/* Price and add button */}
           <div className="flex items-center justify-between pt-2">

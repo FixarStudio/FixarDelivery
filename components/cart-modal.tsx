@@ -105,9 +105,12 @@ export function CartModal({ isOpen, onClose, items = [], onUpdateQuantity, onRem
                       >
                         {item.image && (
                           <img
-                            src={item.image || "/placeholder.svg"}
+                            src={item.image.startsWith('http') ? item.image : `https://ik.imagekit.io/fixarmenu/${item.image}`}
                             alt={item.name}
                             className="w-12 h-12 object-cover rounded-lg"
+                            onError={(e) => {
+                              e.currentTarget.src = "/placeholder.svg";
+                            }}
                           />
                         )}
 

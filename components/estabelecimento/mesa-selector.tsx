@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Users, Clock, CheckCircle, Calendar, MapPin, QrCode } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,77 +10,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
-// Mock data das mesas (em produção viria de uma API)
-const mesasDisponiveis = [
-  {
-    id: 1,
-    number: "1",
-    capacity: 4,
-    status: "free",
-    location: "Salão Principal",
-    qrCode: "mesa-1-qr",
-  },
-  {
-    id: 2,
-    number: "2",
-    capacity: 2,
-    status: "occupied",
-    location: "Salão Principal",
-    qrCode: "mesa-2-qr",
-    currentSession: {
-      startTime: "14:30",
-      people: 2,
-    },
-  },
-  {
-    id: 3,
-    number: "3",
-    capacity: 6,
-    status: "free",
-    location: "Área Externa",
-    qrCode: "mesa-3-qr",
-  },
-  {
-    id: 4,
-    number: "5",
-    capacity: 4,
-    status: "free",
-    location: "Salão Principal",
-    qrCode: "mesa-5-qr",
-  },
-  {
-    id: 5,
-    number: "8",
-    capacity: 8,
-    status: "reserved",
-    location: "Área VIP",
-    qrCode: "mesa-8-qr",
-    currentSession: {
-      reservedFor: "19:00",
-      customerName: "Maria Silva",
-    },
-  },
-  {
-    id: 6,
-    number: "12",
-    capacity: 4,
-    status: "occupied",
-    location: "Salão Principal",
-    qrCode: "mesa-12-qr",
-    currentSession: {
-      startTime: "13:15",
-      people: 2,
-    },
-  },
-]
-
 interface MesaSelectorProps {
   onMesaSelect: (mesa: any) => void
   currentTable?: string | null
 }
 
 export function MesaSelector({ onMesaSelect, currentTable }: MesaSelectorProps) {
-  const [mesas, setMesas] = useState(mesasDisponiveis)
+  const [mesas, setMesas] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [showReserveModal, setShowReserveModal] = useState(false)
   const [selectedMesa, setSelectedMesa] = useState<any>(null)
   const [reserveForm, setReserveForm] = useState({
@@ -91,6 +28,28 @@ export function MesaSelector({ onMesaSelect, currentTable }: MesaSelectorProps) 
     date: "",
     notes: "",
   })
+
+  // Buscar mesas do banco de dados
+  useEffect(() => {
+    const fetchMesas = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch('/api/mesas')
+        if (response.ok) {
+          const data = await response.json()
+          setMesas(data)
+        } else {
+          console.error('Erro ao buscar mesas')
+        }
+      } catch (error) {
+        console.error('Erro ao buscar mesas:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchMesas()
+  }, [])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -131,10 +90,94 @@ export function MesaSelector({ onMesaSelect, currentTable }: MesaSelectorProps) 
     }
   }
 
-  const handleMesaClick = (mesa: any) => {
+  // Função para formatar nome (apenas primeiro e segundo nome)
+  const formatCustomerName = (fullName: string) => {
+    return fullName.split(' ').slice(0, 2).join(' ')
+  }
+
+  // Função para formatar telefone brasileiro
+  const formatPhoneNumber = (phone: string) => {
+    // Remove todos os caracteres não numéricos
+    const cleaned = phone.replace(/\D/g, '')
+    
+    // Se tem 11 dígitos (com DDD), formata como (XX) XXXXX-XXXX
+    if (cleaned.length === 11) {
+      return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`
+    }
+    
+    // Se tem 10 dígitos (com DDD), formata como (XX) XXXX-XXXX
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`
+    }
+    
+    // Se tem 9 dígitos (sem DDD), formata como XXXXX-XXXX
+    if (cleaned.length === 9) {
+      return `${cleaned.slice(0, 5)}-${cleaned.slice(5)}`
+    }
+    
+    // Se tem 8 dígitos (sem DDD), formata como XXXX-XXXX
+    if (cleaned.length === 8) {
+      return `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`
+    }
+    
+    // Se não conseguir formatar, retorna o original
+    return phone
+  }
+
+  const handleMesaClick = async (mesa: any) => {
+    console.log('=== INÍCIO handleMesaClick ===')
+    console.log('Clicou na mesa:', mesa)
+    console.log('Status da mesa:', mesa.status)
+    
+    // Se a mesa está livre, ocupar ela
     if (mesa.status === "free") {
+      console.log('Ocupando mesa livre:', mesa.number)
+      try {
+        const response = await fetch('/api/mesas/occupy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            mesaId: mesa.id,
+            people: mesa.capacity, // Por padrão, usar a capacidade máxima
+          }),
+        })
+
+        console.log('Resposta da API occupy:', response.status)
+
+        if (response.ok) {
+          const result = await response.json()
+          console.log('Mesa ocupada:', result)
+          
+          // Atualizar a lista de mesas
+          const updatedMesas = mesas.map((m) =>
+            m.id === mesa.id
+              ? { ...m, status: "occupied", currentSession: result.session }
+              : m
+          )
+          setMesas(updatedMesas)
+          
+          // Selecionar a mesa
+          console.log('Chamando onMesaSelect...')
+          onMesaSelect(mesa)
+          console.log('onMesaSelect concluído')
+        } else {
+          const error = await response.json()
+          console.error('Erro ao ocupar mesa:', error)
+          alert('Erro ao ocupar mesa: ' + error.error)
+        }
+      } catch (error) {
+        console.error('Erro ao ocupar mesa:', error)
+        alert('Erro ao ocupar mesa')
+      }
+    } 
+    // Se a mesa está ocupada ou reservada, permitir selecionar (pode ser a mesa atual do usuário)
+    else {
+      console.log('Selecionando mesa ocupada/reservada:', mesa.number)
       onMesaSelect(mesa)
     }
+    console.log('=== FIM handleMesaClick ===')
   }
 
   const handleReserveClick = (mesa: any) => {
@@ -150,42 +193,51 @@ export function MesaSelector({ onMesaSelect, currentTable }: MesaSelectorProps) 
     setShowReserveModal(true)
   }
 
-  const handleReserveSubmit = () => {
+  const handleReserveSubmit = async () => {
     if (!reserveForm.customerName || !reserveForm.phone || !reserveForm.time) {
       return
     }
 
-    // Atualizar o status da mesa para reservada
-    setMesas(
-      mesas.map((mesa) =>
-        mesa.id === selectedMesa.id
-          ? {
-              ...mesa,
-              status: "reserved",
-              currentSession: {
-                reservedFor: reserveForm.time,
-                customerName: reserveForm.customerName,
-                phone: reserveForm.phone,
-                people: reserveForm.people,
-                date: reserveForm.date,
-                notes: reserveForm.notes,
-              },
-            }
-          : mesa,
-      ),
-    )
+    try {
+      const response = await fetch('/api/mesas/reserve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mesaId: selectedMesa.id,
+          customerName: reserveForm.customerName,
+          phone: reserveForm.phone,
+          people: reserveForm.people,
+          date: reserveForm.date,
+          time: reserveForm.time,
+          notes: reserveForm.notes,
+        }),
+      })
 
-    setShowReserveModal(false)
-    setSelectedMesa(null)
+      if (response.ok) {
+        const result = await response.json()
+        console.log('Reserva criada:', result)
 
-    // Aqui você enviaria os dados da reserva via WhatsApp ou API
-    const reserveMessage = `🏪 *NOVA RESERVA*
+        // Atualizar a lista de mesas
+        const updatedMesas = mesas.map((mesa) =>
+          mesa.id === selectedMesa.id
+            ? { ...mesa, status: "reserved" }
+            : mesa
+        )
+        setMesas(updatedMesas)
+
+        setShowReserveModal(false)
+        setSelectedMesa(null)
+
+        // Mensagem de sucesso
+        const reserveMessage = `🏪 *NOVA RESERVA*
 
 📅 Data: ${new Date(reserveForm.date).toLocaleDateString("pt-BR")}
 ⏰ Horário: ${reserveForm.time}
 🪑 Mesa: ${selectedMesa.number}
-👤 Cliente: ${reserveForm.customerName}
-📱 Telefone: ${reserveForm.phone}
+👤 Cliente: ${formatCustomerName(reserveForm.customerName)}
+📱 Telefone: ${formatPhoneNumber(reserveForm.phone)}
 👥 Pessoas: ${reserveForm.people}
 📍 Local: ${selectedMesa.location}
 
@@ -193,7 +245,16 @@ ${reserveForm.notes ? `📝 Observações: ${reserveForm.notes}` : ""}
 
 *Reserva confirmada!*`
 
-    console.log("Mensagem de reserva:", reserveMessage)
+        console.log("Mensagem de reserva:", reserveMessage)
+      } else {
+        const error = await response.json()
+        console.error('Erro ao criar reserva:', error)
+        alert('Erro ao criar reserva: ' + error.error)
+      }
+    } catch (error) {
+      console.error('Erro ao criar reserva:', error)
+      alert('Erro ao criar reserva')
+    }
   }
 
   // Agrupar mesas por localização
@@ -213,6 +274,21 @@ ${reserveForm.notes ? `📝 Observações: ${reserveForm.notes}` : ""}
           Selecione uma mesa disponível ou faça uma reserva para mais tarde
         </p>
       </div>
+
+      {loading && (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-orange-500 border-t-transparent"></div>
+          <span className="ml-3 text-gray-600 dark:text-gray-400">Carregando mesas...</span>
+        </div>
+      )}
+
+      {!loading && mesas.length === 0 && (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🪑</div>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Nenhuma mesa encontrada</h3>
+          <p className="text-gray-600 dark:text-gray-400">Entre em contato com o estabelecimento</p>
+        </div>
+      )}
 
       {Object.entries(mesasPorLocal).map(([location, locationMesas]: [string, any]) => (
         <div key={location} className="space-y-4">
@@ -266,11 +342,16 @@ ${reserveForm.notes ? `📝 Observações: ${reserveForm.notes}` : ""}
                       )}
                     </div>
 
-                    {mesa.currentSession && mesa.status === "occupied" && (
+                    {mesa.status === "occupied" && mesa.currentSession && (
                       <div className="bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
                         <div className="flex justify-between text-xs">
                           <span>Ocupada desde:</span>
-                          <span className="font-medium">{mesa.currentSession.startTime}</span>
+                          <span className="font-medium">
+                            {new Date(mesa.currentSession.startTime).toLocaleTimeString('pt-BR', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </span>
                         </div>
                         <div className="flex justify-between text-xs">
                           <span>Pessoas:</span>
@@ -279,15 +360,26 @@ ${reserveForm.notes ? `📝 Observações: ${reserveForm.notes}` : ""}
                       </div>
                     )}
 
-                    {mesa.currentSession && mesa.status === "reserved" && (
+                    {mesa.status === "reserved" && mesa.reservations && mesa.reservations.length > 0 && (
                       <div className="bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded-lg">
                         <div className="flex justify-between text-xs">
                           <span>Reservada para:</span>
-                          <span className="font-medium">{mesa.currentSession.reservedFor}</span>
+                          <span className="font-medium">
+                            {new Date(mesa.reservations[0].reservedFor).toLocaleTimeString('pt-BR', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </span>
                         </div>
                         <div className="flex justify-between text-xs">
                           <span>Cliente:</span>
-                          <span className="font-medium">{mesa.currentSession.customerName}</span>
+                          <span className="font-medium">
+                            {formatCustomerName(mesa.reservations[0].customerName)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>Pessoas:</span>
+                          <span className="font-medium">{mesa.reservations[0].people}</span>
                         </div>
                       </div>
                     )}
@@ -300,7 +392,9 @@ ${reserveForm.notes ? `📝 Observações: ${reserveForm.notes}` : ""}
                             className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
                             onClick={(e) => {
                               e.stopPropagation()
-                              handleMesaClick(mesa)
+                              if (confirm(`Confirmar ocupação da Mesa ${mesa.number}?`)) {
+                                handleMesaClick(mesa)
+                              }
                             }}
                           >
                             <Users className="h-4 w-4 mr-1" />
@@ -422,7 +516,24 @@ ${reserveForm.notes ? `📝 Observações: ${reserveForm.notes}` : ""}
                 id="customer-phone"
                 placeholder="(11) 99999-9999"
                 value={reserveForm.phone}
-                onChange={(e) => setReserveForm((prev) => ({ ...prev, phone: e.target.value }))}
+                onChange={(e) => {
+                  // Remove caracteres não numéricos
+                  const cleaned = e.target.value.replace(/\D/g, '')
+                  
+                  // Formata o telefone
+                  let formatted = cleaned
+                  if (cleaned.length === 11) {
+                    formatted = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`
+                  } else if (cleaned.length === 10) {
+                    formatted = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`
+                  } else if (cleaned.length === 9) {
+                    formatted = `${cleaned.slice(0, 5)}-${cleaned.slice(5)}`
+                  } else if (cleaned.length === 8) {
+                    formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`
+                  }
+                  
+                  setReserveForm((prev) => ({ ...prev, phone: formatted }))
+                }}
               />
             </div>
 

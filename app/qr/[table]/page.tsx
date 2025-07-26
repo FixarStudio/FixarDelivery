@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { QrCode, Smartphone, Wifi, MapPin } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -10,14 +10,58 @@ import { Badge } from "@/components/ui/badge"
 
 export default function QRCodePage() {
   const params = useParams()
+  const tableNumber = params?.table as string || "1"
+  
   const [tableInfo, setTableInfo] = useState({
-    number: params.table as string,
+    number: tableNumber,
     area: "Salão Principal",
     capacity: 4,
-    status: "available",
+    status: "free",
   })
+  const [qrCodeUrl, setQrCodeUrl] = useState("")
+  const [isClient, setIsClient] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
-  const qrCodeUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/cardapio?mesa=${params.table}&area=salao-principal`
+  useEffect(() => {
+    setIsClient(true)
+    
+    // Buscar informações da mesa
+    const fetchTableInfo = async () => {
+      try {
+        setLoading(true)
+        console.log('Buscando mesa:', tableNumber)
+        const response = await fetch(`/api/mesas/${encodeURIComponent(tableNumber)}`)
+        console.log('Response status:', response.status)
+        
+        if (response.ok) {
+          const mesa = await response.json()
+          console.log('Mesa encontrada:', mesa)
+          setTableInfo({
+            number: mesa.number,
+            area: mesa.location,
+            capacity: mesa.capacity,
+            status: mesa.status,
+          })
+        } else {
+          const errorData = await response.json()
+          console.warn('Mesa não encontrada:', errorData)
+          setError(`Mesa não encontrada: ${errorData.tableNumber}`)
+        }
+      } catch (error) {
+        console.error('Erro ao buscar mesa:', error)
+        setError("Erro ao carregar dados da mesa")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchTableInfo()
+    
+    // Gerar URL do QR code
+    const url = `${window.location.origin}/cardapio?mesa=${tableNumber}&area=salao-principal`
+    setQrCodeUrl(url)
+  }, [tableNumber])
 
   const generateQRCode = (url: string) => {
     return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}&bgcolor=ffffff&color=000000&margin=20`
@@ -46,15 +90,28 @@ export default function QRCodePage() {
 
             {/* QR Code */}
             <div className="bg-white p-4 rounded-2xl shadow-inner">
-              <img
-                src={generateQRCode(qrCodeUrl) || "/placeholder.svg"}
-                alt={`QR Code Mesa ${tableInfo.number}`}
-                className="w-full max-w-[250px] mx-auto"
-              />
+              {isClient && qrCodeUrl && !loading ? (
+                <img
+                  src={generateQRCode(qrCodeUrl)}
+                  alt={`QR Code Mesa ${tableInfo.number}`}
+                  className="w-full max-w-[250px] mx-auto"
+                />
+              ) : (
+                <div className="w-full max-w-[250px] h-[250px] mx-auto bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-orange-500 border-t-transparent"></div>
+                </div>
+              )}
             </div>
 
             {/* Table Info */}
             <div className="space-y-3">
+              {error && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    ⚠️ {error}
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-center space-x-2 text-gray-600 dark:text-gray-400">
                 <MapPin className="h-4 w-4" />
                 <span>{tableInfo.area}</span>
@@ -67,10 +124,12 @@ export default function QRCodePage() {
                 <div className="flex items-center space-x-1">
                   <span>Status:</span>
                   <Badge
-                    variant={tableInfo.status === "available" ? "default" : "secondary"}
-                    className={tableInfo.status === "available" ? "bg-green-500" : ""}
+                    variant={tableInfo.status === "free" ? "default" : "secondary"}
+                    className={tableInfo.status === "free" ? "bg-green-500" : ""}
                   >
-                    {tableInfo.status === "available" ? "Disponível" : "Ocupada"}
+                    {tableInfo.status === "free" ? "Disponível" : 
+                     tableInfo.status === "occupied" ? "Ocupada" : 
+                     tableInfo.status === "reserved" ? "Reservada" : "Indisponível"}
                   </Badge>
                 </div>
               </div>
@@ -96,7 +155,8 @@ export default function QRCodePage() {
               <Button
                 variant="outline"
                 className="w-full bg-transparent"
-                onClick={() => window.open(qrCodeUrl, "_blank")}
+                onClick={() => isClient && window.open(qrCodeUrl, "_blank")}
+                disabled={!isClient}
               >
                 <Wifi className="h-4 w-4 mr-2" />
                 Abrir Cardápio Digital

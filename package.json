@@ -46,7 +46,10 @@
     "cmdk": "latest",
     "date-fns": "2.8.0",
     "embla-carousel-react": "latest",
+    "formidable": "^3.5.4",
     "framer-motion": "latest",
+    "imagekit": "^6.0.0",
+    "imagekit-javascript": "^4.0.1",
     "input-otp": "latest",
     "jose": "^6.0.12",
     "jsonwebtoken": "^9.0.2",
@@ -67,6 +70,8 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/formidable": "^3.4.5",
+    "@types/imagekit": "^3.1.5",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22",
     "@types/react": "^19",

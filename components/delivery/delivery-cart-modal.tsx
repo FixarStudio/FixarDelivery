@@ -156,9 +156,12 @@ _Pedido realizado pelo cardápio digital_`
                   <motion.div key={item.id} layout className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 space-y-3">
                     <div className="flex items-start space-x-3">
                       <img
-                        src={item.image || `/placeholder.svg?height=60&width=60&query=${item.name}`}
+                        src={item.image ? `https://ik.imagekit.io/fixarmenu/${item.image}` : `/placeholder.svg?height=60&width=60&query=${item.name}`}
                         alt={item.name}
                         className="w-12 h-12 object-cover rounded-lg flex-shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.src = `/placeholder.svg?height=60&width=60&query=${item.name}`;
+                        }}
                       />
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-gray-900 dark:text-white truncate">{item.name}</h4>

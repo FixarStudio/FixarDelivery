@@ -71,6 +71,78 @@ export default function AdminDashboard() {
   }>({ show: false, type: "", message: "", product: null })
   const [loadingProducts, setLoadingProducts] = useState(false)
 
+  // Estados para gerenciamento de mesas
+  const [mesas, setMesas] = useState<any[]>([])
+  const [loadingMesas, setLoadingMesas] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  const [hasChanges, setHasChanges] = useState(false)
+
+  const fetchMesas = async () => {
+    setLoadingMesas(true)
+    try {
+      const res = await fetch("/api/admin/mesas")
+      console.log('Status da resposta:', res.status)
+      const data = await res.json()
+      console.log('Mesas carregadas da API:', data)
+      console.log('Tipo de data:', typeof data, 'É array?', Array.isArray(data))
+      
+      // Verificar se há mudanças comparando com o estado anterior
+      const hasStatusChanges = mesas.some((oldMesa, index) => {
+        const newMesa = data[index]
+        return newMesa && (
+          oldMesa.status !== newMesa.status ||
+          oldMesa.currentSession?.id !== newMesa.currentSession?.id ||
+          oldMesa.reservations?.length !== newMesa.reservations?.length
+        )
+      })
+      
+      if (hasStatusChanges) {
+        setHasChanges(true)
+        // Mostrar notificação de mudança
+        console.log('🔄 Mudanças detectadas nas mesas - Atualizando...')
+        // Resetar o indicador de mudanças após 6 segundos
+        setTimeout(() => setHasChanges(false), 6000)
+      }
+      
+      // Verificar se data é um array antes de usar forEach
+      if (Array.isArray(data)) {
+        // Verificar se cada mesa tem os dados necessários
+        data.forEach((mesa: any, index: number) => {
+          console.log(`Mesa ${index + 1}:`, {
+            id: mesa.id,
+            number: mesa.number,
+            status: mesa.status,
+            currentSession: mesa.currentSession,
+            reservations: mesa.reservations,
+            lastOrder: mesa.lastOrder
+          })
+        })
+        
+        setMesas(data)
+        setLastUpdate(new Date())
+      } else {
+        console.error('Erro: API retornou dados inválidos:', data)
+        setMesas([])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar mesas:', error)
+    }
+    setLoadingMesas(false)
+  }
+
+  useEffect(() => {
+    // Buscar mesas inicialmente
+    fetchMesas()
+
+    // Configurar polling para atualização em tempo real
+    const interval = setInterval(() => {
+      fetchMesas()
+    }, 20000) // Atualizar a cada 20 segundos
+
+    // Cleanup do intervalo quando o componente for desmontado
+    return () => clearInterval(interval)
+  }, [])
+
   const fetchProducts = async () => {
     setLoadingProducts(true)
     const res = await fetch("/api/admin/products")
@@ -83,63 +155,7 @@ export default function AdminDashboard() {
     fetchProducts()
   }, [])
 
-  // Estados para gerenciamento de mesas
-  const [mesas, setMesas] = useState([
-    {
-      id: 1,
-      number: "1",
-      capacity: 4,
-      status: "free",
-      location: "Salão Principal",
-      qrCode: "mesa-1-qr",
-      currentSession: null,
-      lastOrder: null,
-    },
-    {
-      id: 2,
-      number: "2",
-      capacity: 2,
-      status: "occupied",
-      location: "Salão Principal",
-      qrCode: "mesa-2-qr",
-      currentSession: {
-        startTime: "14:30",
-        people: 2,
-        orders: 1,
-        total: 45.8,
-      },
-      lastOrder: "14:45",
-    },
-    {
-      id: 3,
-      number: "3",
-      capacity: 6,
-      status: "reserved",
-      location: "Área Externa",
-      qrCode: "mesa-3-qr",
-      currentSession: {
-        reservedFor: "15:30",
-        customerName: "João Silva",
-        people: 4,
-      },
-      lastOrder: null,
-    },
-    {
-      id: 4,
-      number: "12",
-      capacity: 4,
-      status: "occupied",
-      location: "Salão Principal",
-      qrCode: "mesa-12-qr",
-      currentSession: {
-        startTime: "13:15",
-        people: 2,
-        orders: 3,
-        total: 89.5,
-      },
-      lastOrder: "14:20",
-    },
-  ])
+
 
   const [showAddMesaModal, setShowAddMesaModal] = useState(false)
   const [editingMesa, setEditingMesa] = useState<any>(null)
@@ -416,51 +432,85 @@ Frete: {frete}
   }
 
   const handleAddProduct = async (formData: any) => {
-    await fetch("/api/admin/products", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData),
-    })
-    setShowAddModal(false)
-    setSuccessModal({
-      show: true,
-      type: "add",
-      message: "Produto adicionado com sucesso!",
-      product: formData,
-    })
-    fetchProducts()
+    try {
+      const response = await fetch("/api/admin/products", {
+        method: "POST",
+        body: formData,
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro ao adicionar produto")
+      }
+      
+      const product = await response.json()
+      setShowAddModal(false)
+      setSuccessModal({
+        show: true,
+        type: "add",
+        message: "Produto adicionado com sucesso!",
+        product: product,
+      })
+      fetchProducts()
+    } catch (error: any) {
+      console.error("Erro ao adicionar produto:", error)
+      alert(error.message || "Erro ao adicionar produto")
+    }
   }
 
   const handleEditProduct = async (formData: any) => {
-    await fetch("/api/admin/products", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...formData, id: editingProduct.id }),
-    })
-    setEditingProduct(null)
-    setSuccessModal({
-      show: true,
-      type: "edit",
-      message: "Produto editado com sucesso!",
-      product: editingProduct,
-    })
-    fetchProducts()
+    try {
+      const response = await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formData, id: editingProduct.id }),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro ao editar produto")
+      }
+      
+      const product = await response.json()
+      setEditingProduct(null)
+      setSuccessModal({
+        show: true,
+        type: "edit",
+        message: "Produto editado com sucesso!",
+        product: product,
+      })
+      fetchProducts()
+    } catch (error: any) {
+      console.error("Erro ao editar produto:", error)
+      alert(error.message || "Erro ao editar produto")
+    }
   }
 
   const handleDeleteProduct = async (product: any) => {
-    await fetch("/api/admin/products", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: product.id }),
-    })
-    setDeletingProduct(null)
-    setSuccessModal({
-      show: true,
-      type: "delete",
-      message: "Produto excluído com sucesso!",
-      product: product,
-    })
-    fetchProducts()
+    try {
+      const response = await fetch("/api/admin/products", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: product.id }),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro ao excluir produto")
+      }
+      
+      setDeletingProduct(null)
+      setSuccessModal({
+        show: true,
+        type: "delete",
+        message: "Produto excluído com sucesso!",
+        product: product,
+      })
+      fetchProducts()
+    } catch (error: any) {
+      console.error("Erro ao excluir produto:", error)
+      alert(error.message || "Erro ao excluir produto")
+    }
   }
 
   // Funções para gerenciamento de mesas
@@ -509,63 +559,195 @@ Frete: {frete}
     }
   }
 
-  const handleAddMesa = () => {
-    const newMesa = {
-      id: Date.now(),
-      number: mesaFormData.number,
-      capacity: mesaFormData.capacity,
-      status: "free",
-      location: mesaFormData.location,
-      qrCode: `mesa-${mesaFormData.number}-qr`,
-      currentSession: null,
-      lastOrder: null,
+  // Função para formatar nome (apenas primeiro e segundo nome)
+  const formatCustomerName = (fullName: string) => {
+    return fullName.split(' ').slice(0, 2).join(' ')
+  }
+
+  // Função para formatar telefone brasileiro
+  const formatPhoneNumber = (phone: string) => {
+    // Remove todos os caracteres não numéricos
+    const cleaned = phone.replace(/\D/g, '')
+    
+    // Se tem 11 dígitos (com DDD), formata como (XX) XXXXX-XXXX
+    if (cleaned.length === 11) {
+      return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`
     }
-
-    setMesas([...mesas, newMesa])
-    setShowAddMesaModal(false)
-    resetMesaForm()
+    
+    // Se tem 10 dígitos (com DDD), formata como (XX) XXXX-XXXX
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`
+    }
+    
+    // Se tem 9 dígitos (sem DDD), formata como XXXXX-XXXX
+    if (cleaned.length === 9) {
+      return `${cleaned.slice(0, 5)}-${cleaned.slice(5)}`
+    }
+    
+    // Se tem 8 dígitos (sem DDD), formata como XXXX-XXXX
+    if (cleaned.length === 8) {
+      return `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`
+    }
+    
+    // Se não conseguir formatar, retorna o original
+    return phone
   }
 
-  const handleEditMesa = () => {
-    setMesas(mesas.map((mesa) => (mesa.id === editingMesa.id ? { ...mesa, ...mesaFormData } : mesa)))
-    setEditingMesa(null)
-    resetMesaForm()
-  }
+  // Debug: log quando editingProduct mudar
+  useEffect(() => {
+    if (editingProduct) {
+      console.log("Editando produto:", editingProduct)
+      console.log("Descrição do produto:", editingProduct.description)
+      console.log("Tempo de preparo do produto:", editingProduct.preparationTime)
+    }
+  }, [editingProduct])
 
-  const handleDeleteMesa = () => {
-    setMesas(mesas.filter((mesa) => mesa.id !== deletingMesa.id))
-    setDeletingMesa(null)
-  }
-
-  const toggleMesaStatus = (mesaId: number) => {
-    setMesas(
-      mesas.map((mesa) => {
-        if (mesa.id === mesaId) {
-          const newStatus = mesa.status === "free" ? "occupied" : "free"
-          if (newStatus === "occupied") {
-            return {
-              ...mesa,
-              status: newStatus,
-              currentSession: {
-                startTime: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-                people: mesa.capacity,
-                orders: 0,
-                total: 0,
-              },
-              lastOrder: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-            }
-          } else {
-            return {
-              ...mesa,
-              status: newStatus,
-              currentSession: null,
-              lastOrder: null,
-            }
-          }
-        }
-        return mesa
+  const handleAddMesa = async () => {
+    try {
+      const response = await fetch("/api/admin/mesas", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          number: mesaFormData.number,
+          capacity: mesaFormData.capacity,
+          location: mesaFormData.location,
+          notes: mesaFormData.notes,
+        }),
       })
-    )
+
+      if (response.ok) {
+        const newMesa = await response.json()
+        console.log('Mesa criada com sucesso:', newMesa)
+        setMesas([...mesas, newMesa])
+        setShowAddMesaModal(false)
+        resetMesaForm()
+      } else {
+        const error = await response.json()
+        console.error('Erro ao criar mesa:', error)
+        alert('Erro ao criar mesa: ' + error.error)
+      }
+    } catch (error) {
+      console.error('Erro ao criar mesa:', error)
+      alert('Erro ao criar mesa')
+    }
+  }
+
+  const handleEditMesa = async () => {
+    try {
+      const response = await fetch("/api/admin/mesas", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: editingMesa.id,
+          number: mesaFormData.number,
+          capacity: mesaFormData.capacity,
+          location: mesaFormData.location,
+          notes: mesaFormData.notes,
+          status: editingMesa.status,
+        }),
+      })
+
+      if (response.ok) {
+        const updatedMesa = await response.json()
+        setMesas(mesas.map((mesa) => (mesa.id === editingMesa.id ? updatedMesa : mesa)))
+        setEditingMesa(null)
+        resetMesaForm()
+      } else {
+        const error = await response.json()
+        console.error('Erro ao editar mesa:', error)
+        alert('Erro ao editar mesa: ' + error.error)
+      }
+    } catch (error) {
+      console.error('Erro ao editar mesa:', error)
+      alert('Erro ao editar mesa')
+    }
+  }
+
+  const handleDeleteMesa = async () => {
+    try {
+      const response = await fetch("/api/admin/mesas", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: deletingMesa.id }),
+      })
+
+      if (response.ok) {
+        setMesas(mesas.filter((mesa) => mesa.id !== deletingMesa.id))
+        setDeletingMesa(null)
+      } else {
+        const error = await response.json()
+        console.error('Erro ao deletar mesa:', error)
+        alert('Erro ao deletar mesa: ' + error.error)
+      }
+    } catch (error) {
+      console.error('Erro ao deletar mesa:', error)
+      alert('Erro ao deletar mesa')
+    }
+  }
+
+  const toggleMesaStatus = async (mesaId: string) => {
+    try {
+      const mesa = mesas.find(m => m.id === mesaId)
+      if (!mesa) return
+
+      if (mesa.status === "free") {
+        // Ocupar mesa
+        const response = await fetch('/api/mesas/occupy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            mesaId: mesaId,
+            people: mesa.capacity,
+          }),
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          console.log('Mesa ocupada:', result)
+          
+          // Recarregar todas as mesas para ter dados completos
+          await fetchMesas()
+        } else {
+          const error = await response.json()
+          console.error('Erro ao ocupar mesa:', error)
+          alert('Erro ao ocupar mesa: ' + error.error)
+        }
+      } else {
+        // Liberar mesa
+        const response = await fetch('/api/mesas/release', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            mesaId: mesaId,
+          }),
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          console.log('Mesa liberada:', result)
+          
+          // Recarregar todas as mesas para ter dados completos
+          await fetchMesas()
+        } else {
+          const error = await response.json()
+          console.error('Erro ao liberar mesa:', error)
+          alert('Erro ao liberar mesa: ' + error.error)
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao alterar status da mesa:', error)
+      alert('Erro ao alterar status da mesa')
+    }
   }
 
   const resetMesaForm = () => {
@@ -593,7 +775,7 @@ Frete: {frete}
     free: mesas.filter((m) => m.status === "free").length,
     occupied: mesas.filter((m) => m.status === "occupied").length,
     reserved: mesas.filter((m) => m.status === "reserved").length,
-    occupancyRate: Math.round((mesas.filter((m) => m.status === "occupied").length / mesas.length) * 100),
+    occupancyRate: mesas.length > 0 ? Math.round((mesas.filter((m) => m.status === "occupied").length / mesas.length) * 100) : 0,
   }
 
   // Funções para gerenciamento de delivery
@@ -733,6 +915,7 @@ Frete: {frete}
             <TabsTrigger value="mesas" className="flex items-center space-x-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Mesas</span>
+              <div className={`w-2 h-2 rounded-full ${hasChanges ? 'bg-orange-500 animate-bounce' : 'bg-green-500 animate-pulse'}`}></div>
             </TabsTrigger>
             <TabsTrigger value="delivery" className="flex items-center space-x-2">
               <Truck className="h-4 w-4" />
@@ -848,9 +1031,12 @@ Frete: {frete}
                     >
                       <div className="flex items-center space-x-4">
                         <img
-                          src={`/placeholder.svg?height=60&width=60&query=${product.name}`}
+                          src={product.image ? `https://ik.imagekit.io/fixarmenu/${product.image}` : `/placeholder.svg?height=60&width=60&query=${product.name}`}
                           alt={product.name}
                           className="w-12 h-12 object-cover rounded-lg"
+                          onError={(e) => {
+                            e.currentTarget.src = `/placeholder.svg?height=60&width=60&query=${product.name}`;
+                          }}
                         />
                         <div>
                           <p className="font-semibold text-gray-900 dark:text-white">{product.name}</p>
@@ -862,8 +1048,8 @@ Frete: {frete}
                       <div className="flex items-center space-x-4">
                         <div className="text-right">
                           <p className="font-bold text-gray-900 dark:text-white">{product.price}</p>
-                          <Badge variant={product.status === "active" ? "default" : "secondary"} className="text-xs">
-                            {product.status === "active" ? "Ativo" : "Inativo"}
+                          <Badge variant={product.available ? "default" : "secondary"} className="text-xs">
+                            {product.available ? "Ativo" : "Inativo"}
                           </Badge>
                         </div>
                         <div className="flex space-x-2">
@@ -891,15 +1077,37 @@ Frete: {frete}
             <div className="flex justify-between items-center">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Gerenciamento de Mesas</h2>
-                <p className="text-gray-600 dark:text-gray-400">Controle o status e ocupação das mesas em tempo real</p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Controle o status e ocupação das mesas em tempo real
+                  <span className="ml-2 text-xs text-gray-500">
+                    Última atualização: {lastUpdate.toLocaleTimeString('pt-BR')}
+                  </span>
+                </p>
               </div>
-              <Button
-                onClick={() => setShowAddMesaModal(true)}
-                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Mesa
-              </Button>
+              <div className="flex items-center space-x-2">
+                {hasChanges && (
+                  <div className="flex items-center space-x-1 text-orange-600 text-sm">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
+                    <span>Mudanças detectadas</span>
+                  </div>
+                )}
+                <Button 
+                  onClick={fetchMesas} 
+                  variant="outline"
+                  disabled={loadingMesas}
+                  className="flex items-center space-x-2"
+                >
+                  <RotateCcw className={`h-4 w-4 ${loadingMesas ? 'animate-spin' : ''}`} />
+                  <span>Atualizar</span>
+                </Button>
+                <Button
+                  onClick={() => setShowAddMesaModal(true)}
+                  className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nova Mesa
+                </Button>
+              </div>
             </div>
 
             {/* Statistics Cards */}
@@ -966,8 +1174,33 @@ Frete: {frete}
             </div>
 
             {/* Mesas Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {mesas.map((mesa, index) => (
+            {loadingMesas ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent mx-auto mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-400">Carregando mesas...</p>
+              </div>
+            ) : mesas.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="mx-auto w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                  <Users className="h-12 w-12 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  Nenhuma mesa cadastrada
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  Comece adicionando sua primeira mesa para gerenciar o estabelecimento.
+                </p>
+                <Button
+                  onClick={() => setShowAddMesaModal(true)}
+                  className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Primeira Mesa
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {mesas.map((mesa, index) => (
                 <motion.div
                   key={mesa.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -980,6 +1213,9 @@ Frete: {frete}
                         <div className="flex items-center space-x-2">
                           <div className={`w-3 h-3 rounded-full ${getStatusColor(mesa.status)}`}></div>
                           <CardTitle className="text-lg">Mesa {mesa.number}</CardTitle>
+                          {hasChanges && (
+                            <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                          )}
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -1019,6 +1255,13 @@ Frete: {frete}
                               <QrCode className="h-4 w-4 mr-2" />
                               Ver QR Code
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => window.open(`/api/mesas/${mesa.number}/orders`, "_blank")}
+                              className="text-green-600"
+                            >
+                              <Package className="h-4 w-4 mr-2" />
+                              Ver Pedidos
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setDeletingMesa(mesa)} className="text-red-600">
                               <Trash2 className="h-4 w-4 mr-2" />
                               Excluir
@@ -1044,37 +1287,88 @@ Frete: {frete}
                         <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg space-y-1">
                           <div className="flex justify-between text-sm">
                             <span>Início:</span>
-                            <span className="font-medium">{mesa.currentSession.startTime}</span>
+                            <span className="font-medium">
+                              {new Date(mesa.currentSession.startTime).toLocaleTimeString('pt-BR', { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Pessoas:</span>
                             <span className="font-medium">{mesa.currentSession.people}</span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span>Pedidos:</span>
-                            <span className="font-medium">{mesa.currentSession.orders}</span>
-                          </div>
-                          <div className="flex justify-between text-sm font-bold">
                             <span>Total:</span>
-                            <span className="text-red-600">R$ {mesa.currentSession.total?.toFixed(2)}</span>
+                            <span className="font-bold text-red-600">R$ {mesa.currentSession.total?.toFixed(2) || '0.00'}</span>
                           </div>
+                          {mesa.lastOrder && (
+                            <>
+                              <div className="flex justify-between text-sm">
+                                <span>Último Pedido:</span>
+                                <span className="font-medium">
+                                  {new Date(mesa.lastOrder.createdAt).toLocaleTimeString('pt-BR', { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}
+                                </span>
+                              </div>
+                              {mesa.lastOrder.items && mesa.lastOrder.items.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-800">
+                                  <div className="text-xs font-medium mb-1">Produtos Pedidos:</div>
+                                  {mesa.lastOrder.items.slice(0, 3).map((item: any, index: number) => (
+                                    <div key={index} className="flex justify-between text-xs">
+                                      <span>{item.product?.name || 'Produto'}</span>
+                                      <span className="font-medium">R$ {item.price?.toFixed(2)}</span>
+                                    </div>
+                                  ))}
+                                  {mesa.lastOrder.items.length > 3 && (
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      +{mesa.lastOrder.items.length - 3} mais...
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
                       )}
 
-                      {mesa.currentSession && mesa.status === "reserved" && (
+
+
+                      {mesa.status === "reserved" && mesa.reservations && mesa.reservations.length > 0 && (
                         <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg space-y-1">
                           <div className="flex justify-between text-sm">
                             <span>Reserva:</span>
-                            <span className="font-medium">{mesa.currentSession.reservedFor}</span>
+                            <span className="font-medium">
+                              {new Date(mesa.reservations[0].reservedFor).toLocaleString('pt-BR', { 
+                                day: '2-digit',
+                                month: '2-digit',
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Cliente:</span>
-                            <span className="font-medium">{mesa.currentSession.customerName}</span>
+                            <span className="font-medium">
+                              {formatCustomerName(mesa.reservations[0].customerName)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Telefone:</span>
+                            <span className="font-medium">{formatPhoneNumber(mesa.reservations[0].phone || 'N/A')}</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Pessoas:</span>
-                            <span className="font-medium">{mesa.currentSession.people}</span>
+                            <span className="font-medium">{mesa.reservations[0].people}</span>
                           </div>
+                          {mesa.reservations[0].notes && (
+                            <div className="flex justify-between text-sm">
+                              <span>Observações:</span>
+                              <span className="font-medium">{mesa.reservations[0].notes}</span>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1088,6 +1382,7 @@ Frete: {frete}
                 </motion.div>
               ))}
             </div>
+            )}
           </TabsContent>
 
           <TabsContent value="delivery" className="space-y-6">
@@ -2253,10 +2548,30 @@ Frete: {frete}
                         placeholder="Descrição do produto..."
                         className="w-full p-2 border border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600"
                         rows={3}
+                        key="add-description"
                       />
                     </div>
 
-                    <Input name="preparationTime" placeholder="Tempo de preparo (ex: 15-20 min)" />
+                    <Input 
+                      name="preparationTime" 
+                      placeholder="Tempo de preparo (ex: 15-20 min)" 
+                      defaultValue="15-20 min"
+                      key="add-prep-time"
+                    />
+
+                    {/* Status */}
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <select
+                        name="available"
+                        defaultValue="true"
+                        required
+                        className="w-full p-2 border border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600"
+                      >
+                        <option value="true">✅ Ativo</option>
+                        <option value="false">❌ Inativo</option>
+                      </select>
+                    </div>
                   </form>
 
                   <div className="flex space-x-2">
@@ -2267,16 +2582,30 @@ Frete: {frete}
                       onClick={() => {
                         const form = document.querySelector("#add-product-form") as HTMLFormElement | null
                         if (!form) return
+                        
+                        // Pegar o arquivo de imagem
+                        const imageInput = form.parentElement?.querySelector('input[type="file"]') as HTMLInputElement
+                        const imageFile = imageInput?.files?.[0]
+                        
                         const formData = new FormData(form)
-                        const data = {
-                          name: formData.get("name"),
-                          price: formData.get("price"),
-                          category: formData.get("category"),
-                          description: formData.get("description"),
-                          preparationTime: formData.get("preparationTime"),
+                        
+                        // Adicionar a imagem ao FormData se existir
+                        if (imageFile) {
+                          formData.append("image", imageFile)
                         }
-                        if (data.name && data.price && data.category) {
-                          handleAddProduct(data)
+                        
+                        const name = formData.get("name")
+                        const price = formData.get("price")
+                        const category = formData.get("category")
+                        const description = formData.get("description")
+                        const preparationTime = formData.get("preparationTime")
+                        
+                        console.log("Dados do formulário de criação:", { name, price, category, description, preparationTime })
+                        
+                        if (name && price && category) {
+                          handleAddProduct(formData)
+                        } else {
+                          alert("Por favor, preencha todos os campos obrigatórios")
                         }
                       }}
                       className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
@@ -2289,7 +2618,7 @@ Frete: {frete}
             </div>
           )}
 
-          {/* Edit Product Modal */}
+                    {/* Edit Product Modal */}
           {editingProduct && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
               <Card className="w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
@@ -2303,9 +2632,12 @@ Frete: {frete}
                     <div className="flex items-center space-x-4">
                       <Input type="file" accept="image/*" className="cursor-pointer flex-1" />
                       <img
-                        src={`/placeholder.svg?height=60&width=60&query=${editingProduct.name}`}
+                        src={editingProduct.image ? `https://ik.imagekit.io/fixarmenu/${editingProduct.image}` : `/placeholder.svg?height=60&width=60&query=${editingProduct.name}`}
                         alt="Preview"
                         className="w-12 h-12 object-cover rounded-lg border"
+                        onError={(e) => {
+                          e.currentTarget.src = `/placeholder.svg?height=60&width=60&query=${editingProduct.name}`;
+                        }}
                       />
                     </div>
                   </div>
@@ -2314,7 +2646,7 @@ Frete: {frete}
                     <Input name="name" defaultValue={editingProduct.name} placeholder="Nome do produto" required />
                     <Input
                       name="price"
-                      defaultValue={editingProduct.price.replace("R$ ", "")}
+                      defaultValue={typeof editingProduct.price === 'string' ? editingProduct.price.replace("R$ ", "") : editingProduct.price}
                       placeholder="Preço (R$)"
                       type="number"
                       step="0.01"
@@ -2347,15 +2679,31 @@ Frete: {frete}
                         placeholder="Descrição do produto..."
                         className="w-full p-2 border border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600"
                         rows={3}
-                        defaultValue="Descrição detalhada do produto..."
+                        defaultValue={editingProduct.description || ""}
+                        key={`desc-${editingProduct.id}`} // Força re-render quando o produto muda
                       />
                     </div>
 
                     <Input
                       name="preparationTime"
                       placeholder="Tempo de preparo (ex: 15-20 min)"
-                      defaultValue="15-20 min"
+                      defaultValue={editingProduct.preparationTime || "15-20 min"}
+                      key={`prep-${editingProduct.id}`} // Força re-render quando o produto muda
                     />
+
+                    {/* Status */}
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <select
+                        name="available"
+                        defaultValue={editingProduct.available ? "true" : "false"}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600"
+                      >
+                        <option value="true">✅ Ativo</option>
+                        <option value="false">❌ Inativo</option>
+                      </select>
+                    </div>
                   </form>
 
                   <div className="flex space-x-2">
@@ -2373,7 +2721,12 @@ Frete: {frete}
                           category: formData.get("category"),
                           description: formData.get("description"),
                           preparationTime: formData.get("preparationTime"),
+                          available: formData.get("available") === "true",
                         }
+                        console.log("Dados do formulário de edição:", data)
+                        console.log("Produto sendo editado:", editingProduct)
+                        console.log("Descrição no formulário:", formData.get("description"))
+                        console.log("Tempo de preparo no formulário:", formData.get("preparationTime"))
                         if (data.name && data.price && data.category) {
                           handleEditProduct(data)
                         }
@@ -2401,9 +2754,12 @@ Frete: {frete}
                 <CardContent className="space-y-4">
                   <div className="text-center">
                     <img
-                      src={`/placeholder.svg?height=80&width=80&query=${deletingProduct.name}`}
+                      src={deletingProduct.image ? `https://ik.imagekit.io/fixarmenu/${deletingProduct.image}` : `/placeholder.svg?height=80&width=80&query=${deletingProduct.name}`}
                       alt={deletingProduct.name}
                       className="w-20 h-20 object-cover rounded-lg mx-auto mb-4 border"
+                      onError={(e) => {
+                        e.currentTarget.src = `/placeholder.svg?height=80&width=80&query=${deletingProduct.name}`;
+                      }}
                     />
                     <p className="text-gray-900 dark:text-white font-semibold">Tem certeza que deseja excluir:</p>
                     <p className="text-lg font-bold text-red-600 mt-2">{deletingProduct.name}</p>

@@ -1,80 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence, easeOut } from "framer-motion"
 import { Search, ShoppingCart, Moon, Sun, QrCode, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CartModal } from "@/components/cart-modal"
 import { ProductCard } from "@/components/product-card"
 import { WhatsAppIntegration } from "@/components/whatsapp-integration"
 import { MesaStatusBar } from "@/components/estabelecimento/mesa-status-bar"
 import { MesaSelector } from "@/components/estabelecimento/mesa-selector"
+import { CategoryTabs } from "@/components/category-tabs"
 
-// Mock data para demonstração
-const categories = [
-  { id: "burgers", name: "🍔 Burgers", count: 12 },
-  { id: "pizzas", name: "🍕 Pizzas", count: 8 },
-  { id: "drinks", name: "🥤 Bebidas", count: 15 },
-  { id: "desserts", name: "🍰 Sobremesas", count: 6 },
-  { id: "salads", name: "🥗 Saladas", count: 5 },
-]
-
-const products = [
-  {
-    id: 1,
-    name: "X-Burger Especial",
-    description: "Hambúrguer artesanal 180g, queijo cheddar, bacon, alface, tomate e molho especial",
-    price: 28.9,
-    image: "/placeholder.svg?height=200&width=300",
-    category: "burgers",
-    rating: 4.8,
-    reviews: 124,
-    badges: ["Mais Pedido", "Premium"],
-    preparationTime: "15-20 min",
-    available: true,
-  },
-  {
-    id: 2,
-    name: "Pizza Margherita",
-    description: "Molho de tomate, mussarela de búfala, manjericão fresco e azeite extravirgem",
-    price: 45.9,
-    image: "/placeholder.svg?height=200&width=300",
-    category: "pizzas",
-    rating: 4.9,
-    reviews: 89,
-    badges: ["Vegetariano", "Novo"],
-    preparationTime: "25-30 min",
-    available: true,
-  },
-  {
-    id: 3,
-    name: "Coca-Cola 350ml",
-    description: "Refrigerante gelado servido na garrafa",
-    price: 6.5,
-    image: "/placeholder.svg?height=200&width=300",
-    category: "drinks",
-    rating: 4.5,
-    reviews: 256,
-    badges: [],
-    preparationTime: "Imediato",
-    available: true,
-  },
-  {
-    id: 4,
-    name: "Petit Gateau",
-    description: "Bolinho de chocolate quente com sorvete de baunilha e calda de chocolate",
-    price: 18.9,
-    image: "/placeholder.svg?height=200&width=300",
-    category: "desserts",
-    rating: 4.7,
-    reviews: 67,
-    badges: ["Sobremesa do Chef"],
-    preparationTime: "10-15 min",
-    available: true,
-  },
-]
+// Categorias base para inicialização
 
 export default function EstabelecimentoPage() {
   const [isDark, setIsDark] = useState(false)
@@ -85,6 +23,18 @@ export default function EstabelecimentoPage() {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
   const [currentTable, setCurrentTable] = useState<string | null>(null)
   const [showMesaSelector, setShowMesaSelector] = useState(false)
+  
+  // Estados para produtos dinâmicos
+  const [products, setProducts] = useState<any[]>([])
+  const [loadingProducts, setLoadingProducts] = useState(false)
+  const [categories, setCategories] = useState([
+    { id: "all", name: "🍽️ Todos", count: 0 },
+    { id: "burgers", name: "🍔 Burgers", count: 0 },
+    { id: "pizzas", name: "🍕 Pizzas", count: 0 },
+    { id: "drinks", name: "🥤 Bebidas", count: 0 },
+    { id: "desserts", name: "🍰 Sobremesas", count: 0 },
+    { id: "salads", name: "🥗 Saladas", count: 0 },
+  ])
 
   const [restaurantInfo] = useState({
     name: "Restaurante Premium",
@@ -93,13 +43,24 @@ export default function EstabelecimentoPage() {
     area: "Salão Principal",
   })
 
-  // Detectar mesa pela URL
+  // Detectar mesa pela URL e localStorage
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const mesa = urlParams.get("mesa")
+    const savedMesa = localStorage.getItem("currentTable")
+    
+
+    
     if (mesa) {
       setCurrentTable(mesa)
+      localStorage.setItem("currentTable", mesa)
       setShowMesaSelector(false)
+    } else if (savedMesa) {
+      setCurrentTable(savedMesa)
+      setShowMesaSelector(false)
+      // Atualizar URL sem recarregar a página
+      const newUrl = `${window.location.pathname}?mesa=${savedMesa}`
+      window.history.pushState({}, "", newUrl)
     } else {
       setShowMesaSelector(true)
     }
@@ -108,6 +69,10 @@ export default function EstabelecimentoPage() {
   const handleMesaSelect = (mesa: any) => {
     setCurrentTable(mesa.number)
     setShowMesaSelector(false)
+    
+    // Persistir mesa no localStorage
+    localStorage.setItem("currentTable", mesa.number)
+    
     // Atualizar URL sem recarregar a página
     const newUrl = `${window.location.pathname}?mesa=${mesa.number}`
     window.history.pushState({}, "", newUrl)
@@ -137,13 +102,20 @@ export default function EstabelecimentoPage() {
   }
 
   // Filtrar produtos
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch =
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory
-    return matchesSearch && matchesCategory
-  })
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      const matchesSearch =
+        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.description.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesCategory = selectedCategory === "all" || product.category === selectedCategory
+      
+      return matchesSearch && matchesCategory
+    })
+  }, [products, searchQuery, selectedCategory])
+  
+
+
+
 
   // Adicionar ao carrinho
   const addToCart = (product: any, quantity = 1) => {
@@ -155,6 +127,115 @@ export default function EstabelecimentoPage() {
       return [...prevCart, { ...product, quantity }]
     })
   }
+
+  // Função para buscar produtos do banco de dados
+  const fetchProducts = async () => {
+    try {
+      setLoadingProducts(true)
+      
+      const response = await fetch('/api/admin/products')
+      
+      if (response.ok) {
+        const productsData = await response.json()
+        
+        // Adicionar dados mockados para campos que não existem no banco
+        const enhancedProducts = productsData.map((product: any) => ({
+          ...product,
+          rating: 4.5 + Math.random() * 0.5, // Rating entre 4.5 e 5.0
+          reviews: Math.floor(Math.random() * 200) + 50, // Reviews entre 50 e 250
+          badges: product.available ? ["Disponível"] : ["Indisponível"],
+          preparationTime: product.preparationTime || (product.category === "drinks" ? "Imediato" : "15-20 min"),
+        }))
+        
+        setProducts(enhancedProducts)
+        
+        // Atualizar contadores das categorias
+        const categoryCounts = enhancedProducts.reduce((acc: any, product: any) => {
+          acc[product.category] = (acc[product.category] || 0) + 1
+          return acc
+        }, {})
+        
+        setCategories(prev => prev.map(cat => ({
+          ...cat,
+          count: cat.id === "all" ? enhancedProducts.length : (categoryCounts[cat.id] || 0)
+        })))
+      } else {
+        console.error('Erro ao buscar produtos:', response.status)
+      }
+    } catch (error) {
+      console.error('Erro ao buscar produtos:', error)
+    } finally {
+      setLoadingProducts(false)
+    }
+  }
+
+  // Buscar produtos quando uma mesa estiver selecionada
+  useEffect(() => {
+    if (currentTable) {
+      fetchProducts()
+    } else {
+      setProducts([])
+    }
+  }, [currentTable])
+
+  // Função para liberar mesa ao sair da página (desabilitada temporariamente)
+  const liberarMesaAoSair = async () => {
+    // Desabilitado para evitar liberação automática
+  }
+
+  // Adicionar listener para liberar mesa ao sair da página
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Só liberar se não estiver na página de admin
+      if (!window.location.pathname.includes('/admin')) {
+        liberarMesaAoSair()
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      // Só liberar se não estiver na página de admin
+      if (document.visibilityState === 'hidden' && !window.location.pathname.includes('/admin')) {
+        liberarMesaAoSair()
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [currentTable])
+
+  // Função para verificar se a mesa ainda está ocupada
+  const verificarStatusMesa = async () => {
+    if (currentTable) {
+      try {
+        const response = await fetch('/api/mesas')
+        if (response.ok) {
+          const mesas = await response.json()
+          const mesaAtual = mesas.find((mesa: any) => mesa.number === currentTable)
+          
+          if (mesaAtual && mesaAtual.status === "free") {
+            setCurrentTable(null)
+            localStorage.removeItem("currentTable")
+            window.history.pushState({}, "", window.location.pathname)
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar status da mesa:', error)
+      }
+    }
+  }
+
+  // Verificar status da mesa periodicamente
+  useEffect(() => {
+    if (currentTable) {
+      const interval = setInterval(verificarStatusMesa, 10000) // Verificar a cada 10 segundos
+      return () => clearInterval(interval)
+    }
+  }, [currentTable])
 
   // Calcular total do carrinho
   const cartTotal = cart.reduce((total, item) => total + item.price * item.quantity, 0)
@@ -211,7 +292,50 @@ export default function EstabelecimentoPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowMesaSelector(true)}
+                  onClick={async () => {
+                    // Liberar mesa atual se existir
+                    if (currentTable) {
+                      try {
+                        // Encontrar a mesa atual no banco
+                        const response = await fetch('/api/mesas')
+                        if (response.ok) {
+                          const mesas = await response.json()
+                          const mesaAtual = mesas.find((mesa: any) => mesa.number === currentTable)
+                          
+                          if (mesaAtual && mesaAtual.status === "occupied") {
+                            // Liberar a mesa
+                            const releaseResponse = await fetch('/api/mesas/release', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                mesaId: mesaAtual.id
+                              }),
+                            })
+                            
+                            if (releaseResponse.ok) {
+                              console.log('Mesa liberada com sucesso')
+                              // Mostrar notificação visual
+                              alert('Mesa liberada com sucesso!')
+                            } else {
+                              console.error('Erro ao liberar mesa')
+                              alert('Erro ao liberar mesa')
+                            }
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Erro ao liberar mesa:', error)
+                      }
+                    }
+                    
+                    setShowMesaSelector(true)
+                    // Limpar mesa atual
+                    setCurrentTable(null)
+                    localStorage.removeItem("currentTable")
+                    // Limpar URL
+                    window.history.pushState({}, "", window.location.pathname)
+                  }}
                   className="flex items-center space-x-1"
                 >
                   <Users className="h-4 w-4" />
@@ -268,43 +392,60 @@ export default function EstabelecimentoPage() {
             transition={{ delay: 0.3 }}
             className="container mx-auto px-4 pb-4"
           >
-            <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
-              <TabsList className="w-full justify-start overflow-x-auto bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-                <TabsTrigger value="all" className="whitespace-nowrap">
-                  🍽️ Todos ({products.length})
-                </TabsTrigger>
-                {categories.map((category) => (
-                  <TabsTrigger key={category.id} value={category.id} className="whitespace-nowrap">
-                    {category.name} ({category.count})
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+            <CategoryTabs 
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onCategoryChange={setSelectedCategory}
+            />
           </motion.div>
 
           {/* Products Grid */}
           <div className="container mx-auto px-4 pb-24">
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-            >
-              <AnimatePresence>
-                {filteredProducts.map((product) => (
-                  <motion.div key={product.id} variants={itemVariants} layout exit={{ opacity: 0, scale: 0.8 }}>
-                    <ProductCard product={product} onAddToCart={addToCart} />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </motion.div>
-
-            {filteredProducts.length === 0 && (
+            {!currentTable ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
-                <div className="text-6xl mb-4">🔍</div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Nenhum produto encontrado</h3>
-                <p className="text-gray-600 dark:text-gray-400">Tente buscar por outro termo ou categoria</p>
+                <div className="text-6xl mb-4">🪑</div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Selecione uma mesa</h3>
+                <p className="text-gray-400">Escolha uma mesa para ver o cardápio</p>
               </motion.div>
+            ) : loadingProducts ? (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent mx-auto mb-4"></div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Carregando produtos...</h3>
+                <p className="text-gray-600 dark:text-gray-400">Aguarde enquanto buscamos os produtos disponíveis</p>
+              </motion.div>
+            ) : products.length === 0 ? (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
+                <div className="text-6xl mb-4">📦</div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Nenhum produto disponível</h3>
+                <p className="text-gray-400">Não há produtos cadastrados no momento</p>
+                <p className="text-sm text-gray-500 mt-2">Mesa: {currentTable} | Produtos: {products.length}</p>
+
+              </motion.div>
+            ) : (
+              <>
+                <motion.div
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                >
+                  <AnimatePresence>
+                    {filteredProducts.map((product) => (
+                      <motion.div key={product.id} variants={itemVariants} layout exit={{ opacity: 0, scale: 0.8 }}>
+                        <ProductCard product={product} onAddToCart={addToCart} />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+
+                {filteredProducts.length === 0 && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
+                    <div className="text-6xl mb-4">🔍</div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Nenhum produto encontrado</h3>
+                    <p className="text-gray-400">Tente buscar por outro termo ou categoria</p>
+                  </motion.div>
+                )}
+              </>
             )}
           </div>
         </>

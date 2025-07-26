@@ -31,22 +31,7 @@ export function MesaStatusBar({ currentTable }: MesaStatusBarProps) {
   }, [currentTable])
 
   if (!currentTable || !currentMesaStatus) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="container mx-auto px-4 py-4"
-      >
-        <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-center space-x-2 text-blue-700 dark:text-blue-300">
-              <QrCode className="h-5 w-5" />
-              <span className="font-medium">Escaneie o QR Code da mesa para começar</span>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    )
+    return null
   }
 
   const getStatusColor = (status: string) => {
