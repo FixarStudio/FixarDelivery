@@ -109,6 +109,9 @@ export default function AdminDashboard() {
   }
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    console.log(`🔄 Iniciando alteração de status - Pedido: ${orderId}, Novo Status: ${newStatus}`)
+    console.log(`🔍 TESTE: Função updateOrderStatus chamada!`)
+    
     try {
       const res = await fetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
@@ -124,6 +127,66 @@ export default function AdminDashboard() {
           order.id === orderId ? { ...order, status: newStatus } : order
         ))
         console.log('Status do pedido atualizado')
+        
+        // Enviar webhook após atualizar o status
+        try {
+          // Encontrar o pedido para obter os dados do cliente
+          const order = orders.find(o => o.id === orderId)
+          console.log(`👤 Dados do pedido:`, order)
+          
+          if (order) {
+            // Mapear status interno para português
+            const statusMapping: { [key: string]: string } = {
+              "pending": "Aguardando Preparo",
+              "preparing": "Em Preparação", 
+              "ready": "Pronto para Entrega",
+              "delivered": "Entregue",
+              "cancelled": "Cancelado"
+            }
+
+            const statusEmPortugues = statusMapping[newStatus]
+            console.log(`📝 Status em português: ${statusEmPortugues}`)
+            
+            if (statusEmPortugues) {
+              // Enviar webhook
+              const webhookData = {
+                nome: order.customerName || "Cliente",
+                numero_cliente: order.customerPhone || "558396881746",
+                status: statusEmPortugues,
+                pedido_id: orderId
+              }
+              
+              console.log(`📤 Enviando webhook com dados:`, webhookData)
+
+              const webhookResponse = await fetch("http://localhost:5678/webhook-test/pedido-status", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(webhookData),
+              })
+
+              const webhookResponseData = await webhookResponse.json()
+              console.log(`📥 Resposta do webhook:`, webhookResponseData)
+              
+              if (webhookResponse.ok) {
+                console.log(`✅ Webhook enviado com sucesso - Pedido ${orderId} atualizado para ${statusEmPortugues}`)
+                // Mostrar notificação de sucesso
+                alert(`✅ Webhook enviado com sucesso!\nPedido: ${orderId}\nStatus: ${statusEmPortugues}`)
+              } else {
+                console.error(`❌ Erro ao enviar webhook para pedido ${orderId}:`, webhookResponseData.message)
+                // Mostrar notificação de erro
+                alert(`❌ Erro ao enviar webhook!\nPedido: ${orderId}\nErro: ${webhookResponseData.message}`)
+              }
+            } else {
+              console.error(`❌ Status não mapeado: ${newStatus}`)
+            }
+          } else {
+            console.error(`❌ Pedido não encontrado: ${orderId}`)
+          }
+        } catch (webhookError) {
+          console.error("❌ Erro ao enviar webhook:", webhookError)
+        }
       } else {
         console.error('Erro ao atualizar status do pedido')
       }
@@ -2751,7 +2814,10 @@ Frete: {frete}
                             {order.status === 'pending' && (
                               <Button
                                 size="sm"
-                                onClick={() => updateOrderStatus(order.id, 'preparing')}
+                                onClick={() => {
+                                  console.log(`🔘 Botão "Iniciar Preparo" clicado para pedido: ${order.id}`)
+                                  updateOrderStatus(order.id, 'preparing')
+                                }}
                                 className="bg-orange-500 hover:bg-orange-600"
                               >
                                 Iniciar Preparo
@@ -2760,7 +2826,10 @@ Frete: {frete}
                             {order.status === 'preparing' && (
                               <Button
                                 size="sm"
-                                onClick={() => updateOrderStatus(order.id, 'ready')}
+                                onClick={() => {
+                                  console.log(`🔘 Botão "Marcar Pronto" clicado para pedido: ${order.id}`)
+                                  updateOrderStatus(order.id, 'ready')
+                                }}
                                 className="bg-green-500 hover:bg-green-600"
                               >
                                 Marcar Pronto
@@ -2769,7 +2838,10 @@ Frete: {frete}
                             {order.status === 'ready' && (
                               <Button
                                 size="sm"
-                                onClick={() => updateOrderStatus(order.id, 'delivered')}
+                                onClick={() => {
+                                  console.log(`🔘 Botão "Entregar" clicado para pedido: ${order.id}`)
+                                  updateOrderStatus(order.id, 'delivered')
+                                }}
                                 className="bg-blue-500 hover:bg-blue-600"
                               >
                                 Entregar
@@ -2959,6 +3031,7 @@ Frete: {frete}
                     {selectedOrder.status === 'pending' && (
                       <Button
                         onClick={() => {
+                          console.log(`🔘 Botão "Iniciar Preparo" (modal) clicado para pedido: ${selectedOrder.id}`)
                           updateOrderStatus(selectedOrder.id, 'preparing')
                           setSelectedOrder(null)
                         }}
@@ -2970,6 +3043,7 @@ Frete: {frete}
                     {selectedOrder.status === 'preparing' && (
                       <Button
                         onClick={() => {
+                          console.log(`🔘 Botão "Marcar Pronto" (modal) clicado para pedido: ${selectedOrder.id}`)
                           updateOrderStatus(selectedOrder.id, 'ready')
                           setSelectedOrder(null)
                         }}
@@ -2981,6 +3055,7 @@ Frete: {frete}
                     {selectedOrder.status === 'ready' && (
                       <Button
                         onClick={() => {
+                          console.log(`🔘 Botão "Entregar" (modal) clicado para pedido: ${selectedOrder.id}`)
                           updateOrderStatus(selectedOrder.id, 'delivered')
                           setSelectedOrder(null)
                         }}
