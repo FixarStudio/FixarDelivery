@@ -54,6 +54,7 @@ export default function DeliveryPage() {
     logo: "/placeholder.svg?height=60&width=120",
     phone: "5511999999999",
     address: "Rua Principal, 123 - Centro",
+    tagline: "",
   })
 
   // Carregar configurações do restaurante
@@ -66,10 +67,10 @@ export default function DeliveryPage() {
           setRestaurantInfo(prev => ({
             ...prev,
             name: config.restaurantName || "Restaurante Premium",
+            logo: config.restaurantLogo || "/placeholder.svg?height=60&width=120",
             phone: config.whatsappNumber || "5511999999999",
+            tagline: config.tagline || "",
           }))
-          
-
         }
       } catch (error) {
         console.error("Erro ao carregar configurações do restaurante:", error)
@@ -191,6 +192,9 @@ export default function DeliveryPage() {
               />
               <div>
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">{restaurantInfo.name}</h1>
+                {restaurantInfo.tagline && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{restaurantInfo.tagline}</p>
+                )}
                 <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                   <Truck className="h-4 w-4" />
                   <span>Delivery</span>

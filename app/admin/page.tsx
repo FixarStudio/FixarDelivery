@@ -28,8 +28,11 @@ import {
   Truck,
   MapPin,
   Phone,
+  Calculator,
+  X,
+  Calendar,
 } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -77,6 +80,57 @@ export default function AdminDashboard() {
   const [loadingMesas, setLoadingMesas] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [hasChanges, setHasChanges] = useState(false)
+
+  // Estados para gerenciamento de pedidos
+  const [orders, setOrders] = useState<any[]>([])
+  const [loadingOrders, setLoadingOrders] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState<any>(null)
+
+  const fetchOrders = async () => {
+    setLoadingOrders(true)
+    try {
+      const res = await fetch("/api/orders")
+      if (res.ok) {
+        const data = await res.json()
+        // A API retorna { success: true, orders: [...] }
+        const ordersArray = data.success && Array.isArray(data.orders) ? data.orders : []
+        setOrders(ordersArray)
+        console.log('Pedidos carregados:', ordersArray)
+      } else {
+        console.error('Erro ao carregar pedidos')
+        setOrders([])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar pedidos:', error)
+      setOrders([])
+    } finally {
+      setLoadingOrders(false)
+    }
+  }
+
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      
+      if (res.ok) {
+        // Atualizar o pedido na lista
+        setOrders(prev => prev.map(order => 
+          order.id === orderId ? { ...order, status: newStatus } : order
+        ))
+        console.log('Status do pedido atualizado')
+      } else {
+        console.error('Erro ao atualizar status do pedido')
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status do pedido:', error)
+    }
+  }
 
   const fetchMesas = async () => {
     setLoadingMesas(true)
@@ -156,6 +210,13 @@ export default function AdminDashboard() {
     fetchProducts()
   }, [])
 
+  // Carregar pedidos quando a aba de fila de produção for selecionada
+  useEffect(() => {
+    if (activeTab === "production") {
+      fetchOrders()
+    }
+  }, [activeTab])
+
 
 
   const [showAddMesaModal, setShowAddMesaModal] = useState(false)
@@ -175,6 +236,7 @@ export default function AdminDashboard() {
     // Configurações básicas
     restaurantName: "Restaurante Premium",
     whatsappNumber: "5511999999999",
+    baseCep: "01000-000",
     address: "Rua Principal, 123 - Centro, São Paulo - SP",
     workingHours: {
       start: "11:00",
@@ -183,7 +245,7 @@ export default function AdminDashboard() {
     },
 
     // Configurações de frete
-    shippingType: "distance", // "fixed", "distance", "cep", "free"
+    shippingType: "zones", // "fixed", "distance", "zones", "free"
     fixedShippingCost: 8.0,
     pricePerKm: 2.5,
     baseShippingCost: 5.0,
@@ -195,11 +257,45 @@ export default function AdminDashboard() {
     timePerKm: 5,
     preparationTime: 20,
 
-    // Áreas de atendimento
+    // Zonas de entrega
+    deliveryZones: [
+      { 
+        id: "zona-centro",
+        name: "Centro", 
+        centerCep: "01000-000", 
+        radius: 2, 
+        basePrice: 5.0, 
+        pricePerKm: 1.5, 
+        color: "#ff6b6b",
+        isActive: true 
+      },
+      { 
+        id: "zona-norte",
+        name: "Zona Norte", 
+        centerCep: "02000-000", 
+        radius: 5, 
+        basePrice: 8.0, 
+        pricePerKm: 2.0, 
+        color: "#4ecdc4",
+        isActive: true 
+      },
+      { 
+        id: "zona-sul",
+        name: "Zona Sul", 
+        centerCep: "04000-000", 
+        radius: 8, 
+        basePrice: 12.0, 
+        pricePerKm: 2.5, 
+        color: "#45b7d1",
+        isActive: true 
+      }
+    ],
+
+    // Áreas de atendimento (legado)
     deliveryAreas: [
-      { name: "Centro", cep: "01000-000", price: 8.0, active: true },
-      { name: "Vila Madalena", cep: "05433-000", price: 12.0, active: true },
-      { name: "Pinheiros", cep: "05422-000", price: 10.0, active: true },
+      { name: "Centro", cep: "01000-000", price: 8.0, active: true, distance: null as number | null },
+      { name: "Vila Madalena", cep: "05433-000", price: 12.0, active: true, distance: null as number | null },
+      { name: "Pinheiros", cep: "05422-000", price: 10.0, active: true, distance: null as number | null },
     ],
 
     // Template de mensagem
@@ -237,6 +333,21 @@ Frete: {frete}
   })
 
   const [showAddDeliveryArea, setShowAddDeliveryArea] = useState(false)
+
+  const [newDeliveryZone, setNewDeliveryZone] = useState({
+    name: "",
+    centerCep: "",
+    radius: 2,
+    basePrice: 5.0,
+    pricePerKm: 1.5,
+    color: "#ff6b6b",
+  })
+
+  const [showAddDeliveryZone, setShowAddDeliveryZone] = useState(false)
+
+  // Estados para simulador de preços
+  const [simulatorCep, setSimulatorCep] = useState("")
+  const [simulatorResult, setSimulatorResult] = useState<any>(null)
 
   const [customization, setCustomization] = useState({
     restaurantName: "Restaurante Premium",
@@ -864,6 +975,7 @@ Frete: {frete}
       setDeliveryConfig({
         restaurantName: "Restaurante Premium",
         whatsappNumber: "5511999999999",
+        baseCep: "01000-000",
         address: "Rua Principal, 123 - Centro, São Paulo - SP",
         workingHours: {
           start: "11:00",
@@ -879,10 +991,42 @@ Frete: {frete}
         baseDeliveryTime: 30,
         timePerKm: 5,
         preparationTime: 20,
+        deliveryZones: [
+          { 
+            id: "zona-centro",
+            name: "Centro", 
+            centerCep: "01000-000", 
+            radius: 2, 
+            basePrice: 5.0, 
+            pricePerKm: 1.5, 
+            color: "#ff6b6b",
+            isActive: true 
+          },
+          { 
+            id: "zona-norte",
+            name: "Zona Norte", 
+            centerCep: "02000-000", 
+            radius: 5, 
+            basePrice: 8.0, 
+            pricePerKm: 2.0, 
+            color: "#4ecdc4",
+            isActive: true 
+          },
+          { 
+            id: "zona-sul",
+            name: "Zona Sul", 
+            centerCep: "04000-000", 
+            radius: 8, 
+            basePrice: 12.0, 
+            pricePerKm: 2.5, 
+            color: "#45b7d1",
+            isActive: true 
+          }
+        ],
         deliveryAreas: [
-          { name: "Centro", cep: "01000-000", price: 8.0, active: true },
-          { name: "Vila Madalena", cep: "05433-000", price: 12.0, active: true },
-          { name: "Pinheiros", cep: "05422-000", price: 10.0, active: true },
+          { name: "Centro", cep: "01000-000", price: 8.0, active: true, distance: null as number | null },
+          { name: "Vila Madalena", cep: "05433-000", price: 12.0, active: true, distance: null as number | null },
+          { name: "Pinheiros", cep: "05422-000", price: 10.0, active: true, distance: null as number | null },
         ],
         messageTemplate: `🛵 *PEDIDO DELIVERY*
 📅 {data} - {hora}
@@ -911,12 +1055,72 @@ Frete: {frete}
     }
   }
 
-  const addDeliveryArea = () => {
-    if (newDeliveryArea.name && newDeliveryArea.cep && newDeliveryArea.price > 0) {
-      setDeliveryConfig((prev) => ({
-        ...prev,
-        deliveryAreas: [...prev.deliveryAreas, { ...newDeliveryArea, active: true }],
-      }))
+  // Função para calcular distância entre dois CEPs
+  const calculateDistanceBetweenCEPs = async (cep1: string, cep2: string) => {
+    try {
+      // Usar API do ViaCEP para obter coordenadas
+      const response1 = await fetch(`https://viacep.com.br/ws/${cep1.replace(/\D/g, '')}/json/`)
+      const response2 = await fetch(`https://viacep.com.br/ws/${cep2.replace(/\D/g, '')}/json/`)
+      
+      const data1 = await response1.json()
+      const data2 = await response2.json()
+      
+      if (data1.erro || data2.erro) {
+        console.error('CEP não encontrado')
+        return null
+      }
+      
+      // Calcular distância usando fórmula de Haversine
+      const lat1 = parseFloat(data1.lat || '0')
+      const lon1 = parseFloat(data1.lng || '0')
+      const lat2 = parseFloat(data2.lat || '0')
+      const lon2 = parseFloat(data2.lng || '0')
+      
+      if (lat1 === 0 || lat2 === 0) {
+        console.error('Coordenadas não disponíveis')
+        return null
+      }
+      
+      const R = 6371 // Raio da Terra em km
+      const dLat = (lat2 - lat1) * Math.PI / 180
+      const dLon = (lon2 - lon1) * Math.PI / 180
+      const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2)
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+      const distance = R * c
+      
+      return distance
+    } catch (error) {
+      console.error('Erro ao calcular distância:', error)
+      return null
+    }
+  }
+
+  const addDeliveryArea = async () => {
+    if (newDeliveryArea.name && newDeliveryArea.cep) {
+      let calculatedPrice = newDeliveryArea.price
+      
+      // Se o CEP base estiver configurado, calcular preço automaticamente
+      if (deliveryConfig.baseCep && deliveryConfig.shippingType === "distance") {
+        const distance = await calculateDistanceBetweenCEPs(deliveryConfig.baseCep, newDeliveryArea.cep)
+        if (distance !== null) {
+          calculatedPrice = deliveryConfig.baseShippingCost + (distance * deliveryConfig.pricePerKm)
+        }
+      }
+      
+              const distance = calculatedPrice !== newDeliveryArea.price ? await calculateDistanceBetweenCEPs(deliveryConfig.baseCep, newDeliveryArea.cep) : null
+        
+        setDeliveryConfig((prev) => ({
+          ...prev,
+          deliveryAreas: [...prev.deliveryAreas, { 
+            ...newDeliveryArea, 
+            price: calculatedPrice,
+            distance: distance,
+            active: true 
+          }],
+        }))
       setNewDeliveryArea({ name: "", cep: "", price: 0 })
       setShowAddDeliveryArea(false)
     }
@@ -934,6 +1138,82 @@ Frete: {frete}
       ...prev,
       deliveryAreas: prev.deliveryAreas.map((area, i) => (i === index ? { ...area, active: !area.active } : area)),
     }))
+  }
+
+  // Funções para gerenciar zonas
+  const addDeliveryZone = () => {
+    if (newDeliveryZone.name && newDeliveryZone.centerCep) {
+      const newZone = {
+        ...newDeliveryZone,
+        id: `zona-${Date.now()}`,
+        isActive: true
+      }
+      setDeliveryConfig((prev) => ({
+        ...prev,
+        deliveryZones: [...prev.deliveryZones, newZone],
+      }))
+      setNewDeliveryZone({ name: "", centerCep: "", radius: 2, basePrice: 5.0, pricePerKm: 1.5, color: "#ff6b6b" })
+      setShowAddDeliveryZone(false)
+    }
+  }
+
+  const removeDeliveryZone = (index: number) => {
+    setDeliveryConfig((prev) => ({
+      ...prev,
+      deliveryZones: prev.deliveryZones.filter((_, i) => i !== index),
+    }))
+  }
+
+  const toggleDeliveryZoneStatus = (index: number) => {
+    setDeliveryConfig((prev) => ({
+      ...prev,
+      deliveryZones: prev.deliveryZones.map((zone, i) => (i === index ? { ...zone, isActive: !zone.isActive } : zone)),
+    }))
+  }
+
+  const updateDeliveryZone = (index: number, field: string, value: any) => {
+    setDeliveryConfig((prev) => ({
+      ...prev,
+      deliveryZones: prev.deliveryZones.map((zone, i) => 
+        i === index ? { ...zone, [field]: value } : zone
+      ),
+    }))
+  }
+
+  // Função para calcular preço baseado nas zonas
+  const calculateZonePrice = async (customerCep: string) => {
+    if (deliveryConfig.shippingType !== "zones") return null
+    
+    let bestPrice = Infinity
+    let bestZone = null
+    let bestDistance = null
+    
+    for (const zone of deliveryConfig.deliveryZones) {
+      if (!zone.isActive) continue
+      
+      const distance = await calculateDistanceBetweenCEPs(zone.centerCep, customerCep)
+      if (distance === null) continue
+      
+      let price = zone.basePrice
+      
+      // Se está fora do raio, cobrar adicional
+      if (distance > zone.radius) {
+        const extraKm = distance - zone.radius
+        price += extraKm * zone.pricePerKm
+      }
+      
+      if (price < bestPrice) {
+        bestPrice = price
+        bestZone = zone
+        bestDistance = distance
+      }
+    }
+    
+    return {
+      price: bestPrice,
+      zone: bestZone,
+      distance: bestDistance
+    }
   }
 
   if (isLoading) {
@@ -973,7 +1253,7 @@ Frete: {frete}
         </motion.div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-7 mb-8">
+          <TabsList className="grid w-full grid-cols-8 mb-8">
             <TabsTrigger value="dashboard" className="flex items-center space-x-2">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -999,9 +1279,13 @@ Frete: {frete}
               <MessageSquare className="h-4 w-4" />
               <span className="hidden sm:inline">WhatsApp</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center space-x-2">
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Config</span>
+            <TabsTrigger value="production" className="flex items-center space-x-2">
+              <Package className="h-4 w-4" />
+              <span className="hidden sm:inline">Fila</span>
+            </TabsTrigger>
+                        <TabsTrigger value="calendar" className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4" />
+              <span className="hidden sm:inline">Calendário</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1503,14 +1787,6 @@ Frete: {frete}
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="delivery-restaurant-name">Nome do Restaurante</Label>
-                        <Input
-                          id="delivery-restaurant-name"
-                          value={deliveryConfig.restaurantName}
-                          onChange={(e) => setDeliveryConfig((prev) => ({ ...prev, restaurantName: e.target.value }))}
-                        />
-                      </div>
-                      <div>
                         <Label htmlFor="delivery-whatsapp">WhatsApp para Delivery</Label>
                         <div className="flex">
                           <span className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-md dark:bg-gray-600 dark:text-gray-400 dark:border-gray-600">
@@ -1524,6 +1800,15 @@ Frete: {frete}
                             className="rounded-l-none"
                           />
                         </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="delivery-base-cep">CEP Base do Restaurante</Label>
+                        <Input
+                          id="delivery-base-cep"
+                          placeholder="00000-000"
+                          value={deliveryConfig.baseCep}
+                          onChange={(e) => setDeliveryConfig((prev) => ({ ...prev, baseCep: e.target.value }))}
+                        />
                       </div>
                     </div>
 
@@ -1741,88 +2026,154 @@ Frete: {frete}
                 </Card>
               </TabsContent>
 
-              {/* Áreas de Entrega */}
+              {/* Zonas de Entrega */}
               <TabsContent value="areas" className="space-y-6">
                 <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
                   <CardHeader>
                     <div className="flex justify-between items-center">
                       <CardTitle className="flex items-center space-x-2">
                         <MapPin className="h-5 w-5" />
-                        <span>Áreas de Atendimento</span>
+                        <span>Zonas de Entrega</span>
                       </CardTitle>
                       <Button
-                        onClick={() => setShowAddDeliveryArea(true)}
+                        onClick={() => setShowAddDeliveryZone(true)}
                         size="sm"
                         className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
                       >
                         <Plus className="h-4 w-4 mr-2" />
-                        Nova Área
+                        Nova Zona
                       </Button>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    {deliveryConfig.deliveryAreas.map((area, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                      >
-                        <div className="flex items-center space-x-4">
-                          <Switch checked={area.active} onCheckedChange={() => toggleDeliveryAreaStatus(index)} />
-                          <div>
-                            <p className="font-medium text-gray-900 dark:text-white">{area.name}</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">CEP: {area.cep}</p>
+                  <CardContent className="space-y-6">
+                    {/* Visualização das Zonas */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {deliveryConfig.deliveryZones.map((zone, index) => (
+                        <div
+                          key={zone.id}
+                          className="relative p-4 rounded-lg border-2"
+                          style={{ 
+                            borderColor: zone.color,
+                            backgroundColor: `${zone.color}10`
+                          }}
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-2">
+                              <div 
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: zone.color }}
+                              />
+                              <h3 className="font-semibold text-gray-900 dark:text-white">
+                                {zone.name}
+                              </h3>
+                            </div>
+                            <Switch 
+                              checked={zone.isActive} 
+                              onCheckedChange={() => toggleDeliveryZoneStatus(index)} 
+                            />
+                          </div>
+                          
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600 dark:text-gray-400">CEP Central:</span>
+                              <span className="font-medium">{zone.centerCep}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600 dark:text-gray-400">Raio:</span>
+                              <span className="font-medium">{zone.radius} km</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600 dark:text-gray-400">Preço Base:</span>
+                              <span className="font-medium text-green-600">R$ {zone.basePrice.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600 dark:text-gray-400">Preço/km extra:</span>
+                              <span className="font-medium">R$ {zone.pricePerKm.toFixed(2)}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-3 flex justify-end space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeDeliveryZone(index)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant={area.active ? "default" : "secondary"}>R$ {area.price.toFixed(2)}</Badge>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeDeliveryArea(index)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
 
-                    {showAddDeliveryArea && (
-                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg space-y-4">
-                        <h4 className="font-medium text-blue-900 dark:text-blue-100">Adicionar Nova Área</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Adicionar Nova Zona */}
+                    {showAddDeliveryZone && (
+                      <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-lg space-y-4">
+                        <h4 className="font-medium text-blue-900 dark:text-blue-100">Adicionar Nova Zona</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           <div>
-                            <Label htmlFor="delivery-area-name">Nome da Área</Label>
+                            <Label htmlFor="zone-name">Nome da Zona</Label>
                             <Input
-                              id="delivery-area-name"
+                              id="zone-name"
                               placeholder="Ex: Centro"
-                              value={newDeliveryArea.name}
-                              onChange={(e) => setNewDeliveryArea((prev) => ({ ...prev, name: e.target.value }))}
+                              value={newDeliveryZone.name}
+                              onChange={(e) => setNewDeliveryZone((prev) => ({ ...prev, name: e.target.value }))}
                             />
                           </div>
                           <div>
-                            <Label htmlFor="delivery-area-cep">CEP Base</Label>
+                            <Label htmlFor="zone-center-cep">CEP Central</Label>
                             <Input
-                              id="delivery-area-cep"
+                              id="zone-center-cep"
                               placeholder="00000-000"
-                              value={newDeliveryArea.cep}
-                              onChange={(e) => setNewDeliveryArea((prev) => ({ ...prev, cep: e.target.value }))}
+                              value={newDeliveryZone.centerCep}
+                              onChange={(e) => setNewDeliveryZone((prev) => ({ ...prev, centerCep: e.target.value }))}
                             />
                           </div>
                           <div>
-                            <Label htmlFor="delivery-area-price">Preço (R$)</Label>
+                            <Label htmlFor="zone-radius">Raio (km)</Label>
                             <Input
-                              id="delivery-area-price"
+                              id="zone-radius"
+                              type="number"
+                              min="1"
+                              max="50"
+                              value={newDeliveryZone.radius}
+                              onChange={(e) => setNewDeliveryZone((prev) => ({ ...prev, radius: Number.parseInt(e.target.value) || 2 }))}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="zone-base-price">Preço Base (R$)</Label>
+                            <Input
+                              id="zone-base-price"
                               type="number"
                               step="0.01"
-                              value={newDeliveryArea.price}
-                              onChange={(e) =>
-                                setNewDeliveryArea((prev) => ({
-                                  ...prev,
-                                  price: Number.parseFloat(e.target.value) || 0,
-                                }))
-                              }
+                              value={newDeliveryZone.basePrice}
+                              onChange={(e) => setNewDeliveryZone((prev) => ({ ...prev, basePrice: Number.parseFloat(e.target.value) || 0 }))}
                             />
+                          </div>
+                          <div>
+                            <Label htmlFor="zone-price-per-km">Preço/km extra (R$)</Label>
+                            <Input
+                              id="zone-price-per-km"
+                              type="number"
+                              step="0.01"
+                              value={newDeliveryZone.pricePerKm}
+                              onChange={(e) => setNewDeliveryZone((prev) => ({ ...prev, pricePerKm: Number.parseFloat(e.target.value) || 0 }))}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="zone-color">Cor da Zona</Label>
+                            <div className="flex space-x-2">
+                              {["#ff6b6b", "#4ecdc4", "#45b7d1", "#96ceb4", "#feca57", "#ff9ff3"].map((color) => (
+                                <button
+                                  key={color}
+                                  className={`w-8 h-8 rounded-full border-2 ${
+                                    newDeliveryZone.color === color ? 'border-gray-800' : 'border-gray-300'
+                                  }`}
+                                  style={{ backgroundColor: color }}
+                                  onClick={() => setNewDeliveryZone((prev) => ({ ...prev, color }))}
+                                />
+                              ))}
+                            </div>
                           </div>
                         </div>
                         <div className="flex space-x-2">
@@ -1830,20 +2181,79 @@ Frete: {frete}
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              setShowAddDeliveryArea(false)
-                              setNewDeliveryArea({ name: "", cep: "", price: 0 })
+                              setShowAddDeliveryZone(false)
+                              setNewDeliveryZone({ name: "", centerCep: "", radius: 2, basePrice: 5.0, pricePerKm: 1.5, color: "#ff6b6b" })
                             }}
                           >
                             Cancelar
                           </Button>
                           <Button
                             size="sm"
-                            onClick={addDeliveryArea}
-                            disabled={!newDeliveryArea.name || !newDeliveryArea.cep || newDeliveryArea.price <= 0}
+                            onClick={addDeliveryZone}
+                            disabled={!newDeliveryZone.name || !newDeliveryZone.centerCep}
                             className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
                           >
-                            Adicionar
+                            Adicionar Zona
                           </Button>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Simulador de Preços */}
+                <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Calculator className="h-5 w-5" />
+                      <span>Simulador de Preços</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex space-x-4">
+                      <div className="flex-1">
+                        <Label htmlFor="simulator-cep">CEP do Cliente</Label>
+                        <Input
+                          id="simulator-cep"
+                          placeholder="00000-000"
+                          value={simulatorCep}
+                          onChange={(e) => setSimulatorCep(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          onClick={async () => {
+                            if (simulatorCep) {
+                              const result = await calculateZonePrice(simulatorCep)
+                              setSimulatorResult(result)
+                            }
+                          }}
+                          disabled={!simulatorCep}
+                          className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                        >
+                          Calcular
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {simulatorResult && (
+                      <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <h4 className="font-medium text-green-900 dark:text-green-100 mb-2">
+                          Resultado do Cálculo
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-400">Zona:</span>
+                            <span className="font-medium">{simulatorResult.zone.name}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-400">Distância:</span>
+                            <span className="font-medium">{simulatorResult.distance?.toFixed(1)} km</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-400">Preço do Frete:</span>
+                            <span className="font-medium text-green-600">R$ {simulatorResult.price.toFixed(2)}</span>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -2235,6 +2645,152 @@ Frete: {frete}
             </div>
           </TabsContent>
 
+          <TabsContent value="production" className="space-y-6">
+            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Package className="h-5 w-5" />
+                    <span>Fila de Produção</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={fetchOrders}
+                    disabled={loadingOrders}
+                  >
+                    <RotateCcw className={`h-4 w-4 mr-2 ${loadingOrders ? 'animate-spin' : ''}`} />
+                    Atualizar
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingOrders ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-4 border-orange-500 border-t-transparent"></div>
+                    <span className="ml-3 text-gray-600 dark:text-gray-400">Carregando pedidos...</span>
+                  </div>
+                ) : orders.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">📦</div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Nenhum pedido encontrado</h3>
+                    <p className="text-gray-600 dark:text-gray-400">Os pedidos aparecerão aqui quando forem criados</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {Array.isArray(orders) && orders
+                      .filter(order => ['pending', 'preparing', 'ready'].includes(order.status))
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                      .map((order, index) => (
+                        <motion.div
+                          key={order.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-700"
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-3">
+                              <Badge variant="secondary" className="text-xs">
+                                #{order.id.slice(-6).toUpperCase()}
+                              </Badge>
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                {new Date(order.createdAt).toLocaleTimeString('pt-BR', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </span>
+                            </div>
+                            <Badge 
+                              className={`text-xs ${
+                                order.status === 'pending' ? 'bg-yellow-500' :
+                                order.status === 'preparing' ? 'bg-orange-500' :
+                                order.status === 'ready' ? 'bg-green-500' : 'bg-gray-500'
+                              }`}
+                            >
+                              {getStatusText(order.status)}
+                            </Badge>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="font-medium">Cliente:</span>
+                              <span>{order.customerName}</span>
+                            </div>
+                            {order.customerPhone && (
+                              <div className="flex justify-between text-sm">
+                                <span className="font-medium">Telefone:</span>
+                                <span>{formatPhoneNumber(order.customerPhone)}</span>
+                              </div>
+                            )}
+                            {order.deliveryType === 'delivery' && (
+                              <div className="flex justify-between text-sm">
+                                <span className="font-medium">Tipo:</span>
+                                <span className="text-blue-600">Delivery</span>
+                              </div>
+                            )}
+                            {order.deliveryType === 'local' && order.tableId && (
+                              <div className="flex justify-between text-sm">
+                                <span className="font-medium">Mesa:</span>
+                                <span>Mesa {order.tableId}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-sm">
+                              <span className="font-medium">Total:</span>
+                              <span className="font-bold">R$ {order.total.toFixed(2)}</span>
+                            </div>
+                          </div>
+
+                          {order.observations && (
+                            <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-sm">
+                              <span className="font-medium">Observações:</span> {order.observations}
+                            </div>
+                          )}
+
+                          <div className="mt-4 flex space-x-2">
+                            {order.status === 'pending' && (
+                              <Button
+                                size="sm"
+                                onClick={() => updateOrderStatus(order.id, 'preparing')}
+                                className="bg-orange-500 hover:bg-orange-600"
+                              >
+                                Iniciar Preparo
+                              </Button>
+                            )}
+                            {order.status === 'preparing' && (
+                              <Button
+                                size="sm"
+                                onClick={() => updateOrderStatus(order.id, 'ready')}
+                                className="bg-green-500 hover:bg-green-600"
+                              >
+                                Marcar Pronto
+                              </Button>
+                            )}
+                            {order.status === 'ready' && (
+                              <Button
+                                size="sm"
+                                onClick={() => updateOrderStatus(order.id, 'delivered')}
+                                className="bg-blue-500 hover:bg-blue-600"
+                              >
+                                Entregar
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setSelectedOrder(order)}
+                            >
+                              Ver Detalhes
+                            </Button>
+                          </div>
+                        </motion.div>
+                      ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="whatsapp" className="space-y-6">
             <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
               <CardHeader>
@@ -2302,6 +2858,142 @@ Frete: {frete}
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Order Details Modal */}
+          {selectedOrder && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <Card className="w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Detalhes do Pedido #{selectedOrder.id.slice(-6).toUpperCase()}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedOrder(null)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="font-medium">Status:</span>
+                      <Badge 
+                        className={`${
+                          selectedOrder.status === 'pending' ? 'bg-yellow-500' :
+                          selectedOrder.status === 'preparing' ? 'bg-orange-500' :
+                          selectedOrder.status === 'ready' ? 'bg-green-500' : 'bg-gray-500'
+                        }`}
+                      >
+                        {getStatusText(selectedOrder.status)}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Cliente:</span>
+                      <span>{selectedOrder.customerName}</span>
+                    </div>
+                    {selectedOrder.customerPhone && (
+                      <div className="flex justify-between">
+                        <span className="font-medium">Telefone:</span>
+                        <span>{formatPhoneNumber(selectedOrder.customerPhone)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="font-medium">Tipo:</span>
+                      <span className={selectedOrder.deliveryType === 'delivery' ? 'text-blue-600' : 'text-green-600'}>
+                        {selectedOrder.deliveryType === 'delivery' ? 'Delivery' : 'Local'}
+                      </span>
+                    </div>
+                    {selectedOrder.deliveryType === 'local' && selectedOrder.tableId && (
+                      <div className="flex justify-between">
+                        <span className="font-medium">Mesa:</span>
+                        <span>Mesa {selectedOrder.tableId}</span>
+                      </div>
+                    )}
+                    {selectedOrder.deliveryAddress && (
+                      <div className="flex justify-between">
+                        <span className="font-medium">Endereço:</span>
+                        <span className="text-sm text-right">{selectedOrder.deliveryAddress}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="font-medium">Total:</span>
+                      <span className="font-bold">R$ {selectedOrder.total.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Data:</span>
+                      <span>{new Date(selectedOrder.createdAt).toLocaleString('pt-BR')}</span>
+                    </div>
+                  </div>
+
+                  {selectedOrder.observations && (
+                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                      <span className="font-medium">Observações:</span>
+                      <p className="mt-1 text-sm">{selectedOrder.observations}</p>
+                    </div>
+                  )}
+
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium mb-2">Itens do Pedido:</h4>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedOrder.items) ? selectedOrder.items.map((item: any, index: number) => (
+                        <div key={index} className="flex justify-between text-sm">
+                          <span>{item.quantity}x {item.name}</span>
+                          <span>R$ {(item.price * item.quantity).toFixed(2)}</span>
+                        </div>
+                      )) : (
+                        <p className="text-sm text-gray-500">Detalhes dos itens não disponíveis</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-2 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setSelectedOrder(null)}
+                      className="flex-1"
+                    >
+                      Fechar
+                    </Button>
+                    {selectedOrder.status === 'pending' && (
+                      <Button
+                        onClick={() => {
+                          updateOrderStatus(selectedOrder.id, 'preparing')
+                          setSelectedOrder(null)
+                        }}
+                        className="flex-1 bg-orange-500 hover:bg-orange-600"
+                      >
+                        Iniciar Preparo
+                      </Button>
+                    )}
+                    {selectedOrder.status === 'preparing' && (
+                      <Button
+                        onClick={() => {
+                          updateOrderStatus(selectedOrder.id, 'ready')
+                          setSelectedOrder(null)
+                        }}
+                        className="flex-1 bg-green-500 hover:bg-green-600"
+                      >
+                        Marcar Pronto
+                      </Button>
+                    )}
+                    {selectedOrder.status === 'ready' && (
+                      <Button
+                        onClick={() => {
+                          updateOrderStatus(selectedOrder.id, 'delivered')
+                          setSelectedOrder(null)
+                        }}
+                        className="flex-1 bg-blue-500 hover:bg-blue-600"
+                      >
+                        Entregar
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Add Product Modal */}
           {showAddModal && (
@@ -2863,6 +3555,85 @@ Frete: {frete}
               </Card>
             </div>
           )}
+
+          {/* Calendário de Reservas */}
+          <TabsContent value="calendar" className="space-y-6">
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* Calendário Principal */}
+              <div className="lg:col-span-2">
+                <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Calendar className="h-5 w-5" />
+                      <span>Calendário de Reservas</span>
+                    </CardTitle>
+                    <CardDescription>
+                      Visualize todas as reservas de mesas em um calendário interativo
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-12">
+                      <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">Calendário de Reservas</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Visualize e gerencie todas as reservas de mesas em um calendário interativo
+                      </p>
+                      <Button 
+                        onClick={() => window.open('/admin/calendario-reservas', '_blank')}
+                        className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        Abrir Calendário Completo
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Painel Lateral */}
+              <div className="space-y-6">
+                {/* Estatísticas Rápidas */}
+                <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-primary">Estatísticas de Reservas</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-primary">0</div>
+                        <div className="text-sm text-muted-foreground">Reservas Hoje</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">0</div>
+                        <div className="text-sm text-muted-foreground">Reservas Semana</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Ações Rápidas */}
+                <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-primary">Ações Rápidas</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Button className="w-full justify-start">
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Nova Reserva
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start">
+                      <Users className="w-4 h-4 mr-2" />
+                      Gerenciar Mesas
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start">
+                      <Clock className="w-4 h-4 mr-2" />
+                      Relatórios
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
     </div>

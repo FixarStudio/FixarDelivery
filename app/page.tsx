@@ -22,6 +22,7 @@ export default function EstabelecimentoPage() {
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [cart, setCart] = useState<any[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
+  const [whatsappNumber, setWhatsappNumber] = useState("5511999999999")
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
   const [currentTable, setCurrentTable] = useState<string | null>(null)
   const [showMesaSelector, setShowMesaSelector] = useState(false)
@@ -79,7 +80,10 @@ export default function EstabelecimentoPage() {
             restaurantLogo: config.restaurantLogo || null,
           })
           
-
+          // Carregar número do WhatsApp
+          if (config.whatsappNumber) {
+            setWhatsappNumber(config.whatsappNumber)
+          }
           
           console.log("Nome do restaurante definido como:", config.restaurantName)
         } else {
@@ -255,6 +259,82 @@ export default function EstabelecimentoPage() {
       }
       return [...prevCart, { ...product, quantity }]
     })
+  }
+
+  // Remover do carrinho
+  const removeFromCart = (productId: number) => {
+    setCart(prev => prev.filter(item => item.id !== productId))
+  }
+
+  // Atualizar quantidade no carrinho
+  const updateCartQuantity = (productId: number, quantity: number) => {
+    setCart(prev => prev.map(item => 
+      item.id === productId ? { ...item, quantity } : item
+    ))
+  }
+
+  const handleCheckout = async (orderData: any) => {
+    try {
+      // 1. Criar o pedido no banco de dados
+      const orderResponse = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(orderData),
+      })
+
+      if (!orderResponse.ok) {
+        throw new Error("Erro ao criar pedido")
+      }
+
+      const orderResult = await orderResponse.json()
+      const order = orderResult.order
+
+      // 2. Preparar mensagem do WhatsApp
+      const itemsText = orderData.items
+        .map((item: any) => `${item.quantity}x ${item.name} - R$ ${(item.price * item.quantity).toFixed(2)}`)
+        .join("\n")
+
+      const observations = orderData.observations ? `\n\n📝 Observações: ${orderData.observations}` : ""
+      const customerInfo = orderData.customerName ? `\n👤 Cliente: ${orderData.customerName}` : ""
+      const phoneInfo = orderData.customerPhone ? `\n📱 Telefone: ${orderData.customerPhone}` : ""
+
+      // Gerar URL de acompanhamento
+      const baseUrl = window.location.origin || window.location.protocol + '//' + window.location.host
+      const trackingUrl = `${baseUrl}/acompanhar-pedido/${order.id}`
+
+      const message = `🛵 *NOVO PEDIDO #${order.id.slice(-6).toUpperCase()}*
+${customerInfo}${phoneInfo}
+
+🍽️ *ITENS:*
+${itemsText}
+
+💰 *TOTAL: R$ ${orderData.total.toFixed(2)}*${observations}
+
+⏱️ Status: Aguardando preparo
+🆔 ID: ${order.id}
+
+📱 *ACOMPANHAR PEDIDO:*
+${trackingUrl}
+
+_Pedido criado automaticamente pelo sistema_`
+
+      // 3. Abrir WhatsApp com a mensagem
+      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
+      window.open(whatsappUrl, "_blank")
+
+      // 4. Limpar carrinho e fechar modal
+      setCart([])
+      setIsCartOpen(false)
+
+      // 5. Redirecionar para página de acompanhamento
+      window.location.href = `/acompanhar-pedido/${order.id}`
+
+    } catch (error) {
+      console.error("Erro ao finalizar pedido:", error)
+      alert("Erro ao finalizar pedido. Tente novamente.")
+    }
   }
 
 
@@ -531,8 +611,6 @@ export default function EstabelecimentoPage() {
       {/* Main Content - só mostra quando uma mesa está selecionada */}
       {!showMesaSelector && (
         <>
-          {/* Mesa Status Bar */}
-          <MesaStatusBar currentTable={currentTable} />
 
           {/* Search Bar */}
           <motion.div
@@ -576,10 +654,10 @@ export default function EstabelecimentoPage() {
 
           {/* Products Grid */}
           <div className="container mx-auto px-4 pb-24">
-            <div className="text-center py-2 text-xs text-gray-500 bg-yellow-100 p-2 rounded mb-4">
-              Debug: Mesa {currentTable} | Loading: {loadingProducts.toString()} | Produtos: {products.length} | Filtrados: {filteredProducts.length}
-              <br />
-              localStorage: {typeof window !== 'undefined' && localStorage.getItem(`products_${currentTable}`) ? 'Sim' : 'Não'}
+            <div className="text-center py-2 text-xs  p-2 rounded mb-4">
+              {/* Debug: Mesa {currentTable} | Loading: {loadingProducts.toString()} | Produtos: {products.length} | Filtrados: {filteredProducts.length}
+              <br /> */}
+              {/* localStorage: {typeof window !== 'undefined' && localStorage.getItem(`products_${currentTable}`) ? 'Sim' : 'Não'} */}
             </div>
             {!currentTable ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
@@ -674,20 +752,11 @@ export default function EstabelecimentoPage() {
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         items={cart}
-        onUpdateQuantity={(id, quantity) => {
-          setCart((prevCart) =>
-            prevCart
-              .map((item) => (item.id === id ? { ...item, quantity } : item))
-              .filter((item) => item.quantity > 0)
-          )
-        }}
-        onRemoveItem={(id) => {
-          setCart((prevCart) => prevCart.filter((item) => item.id !== id))
-        }}
-        onCheckout={() => {
-          setCart([])
-          setIsCartOpen(false)
-        }}
+        onUpdateQuantity={updateCartQuantity}
+        onRemoveItem={removeFromCart}
+        onCheckout={handleCheckout}
+        currentTable={currentTable}
+        restaurantInfo={restaurantInfo}
       />
 
       {/* WhatsApp Integration */}

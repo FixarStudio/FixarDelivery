@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Plus, Minus, ShoppingCart, Trash2 } from "lucide-react"
+import { X, Plus, Minus, ShoppingCart, Trash2, User, Phone, MapPin, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -23,11 +23,21 @@ interface CartModalProps {
   items?: CartItem[]
   onUpdateQuantity?: (id: number, quantity: number) => void
   onRemoveItem?: (id: number) => void
-  onCheckout?: () => void
+  onCheckout?: (orderData: any) => void
+  currentTable?: string | null
+  restaurantInfo?: any
 }
 
-export function CartModal({ isOpen, onClose, items = [], onUpdateQuantity, onRemoveItem, onCheckout }: CartModalProps) {
+export function CartModal({ isOpen, onClose, items = [], onUpdateQuantity, onRemoveItem, onCheckout, currentTable, restaurantInfo }: CartModalProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [showOrderForm, setShowOrderForm] = useState(false)
+  const [orderData, setOrderData] = useState({
+    customerName: "",
+    customerPhone: "",
+    observations: "",
+    deliveryAddress: "",
+    deliveryType: "local"
+  })
 
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
@@ -41,9 +51,34 @@ export function CartModal({ isOpen, onClose, items = [], onUpdateQuantity, onRem
   }
 
   const handleCheckout = async () => {
+    if (items.length === 0) return
+    
+    setShowOrderForm(true)
+  }
+
+  const handleSubmitOrder = async () => {
     setIsLoading(true)
     try {
-      await onCheckout?.()
+      const orderPayload = {
+        tableId: currentTable,
+        items: items,
+        total: total,
+        customerName: orderData.customerName || "Cliente",
+        customerPhone: orderData.customerPhone || "",
+        observations: orderData.observations || "",
+        deliveryAddress: orderData.deliveryAddress || "",
+        deliveryType: orderData.deliveryType
+      }
+      
+      await onCheckout?.(orderPayload)
+      setShowOrderForm(false)
+      setOrderData({
+        customerName: "",
+        customerPhone: "",
+        observations: "",
+        deliveryAddress: "",
+        deliveryType: "local"
+      })
     } finally {
       setIsLoading(false)
     }
@@ -158,7 +193,7 @@ export function CartModal({ isOpen, onClose, items = [], onUpdateQuantity, onRem
                 )}
               </CardContent>
 
-              {items.length > 0 && (
+              {items.length > 0 && !showOrderForm && (
                 <div className="p-6 pt-4 border-t">
                   <div className="space-y-4">
                     <Separator />
@@ -182,6 +217,89 @@ export function CartModal({ isOpen, onClose, items = [], onUpdateQuantity, onRem
                         `Finalizar Pedido - R$ ${total.toFixed(2)}`
                       )}
                     </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Formulário de Pedido */}
+              {showOrderForm && (
+                <div className="p-6 pt-4 border-t">
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">Informações do Pedido</h3>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Nome do Cliente
+                        </label>
+                        <div className="relative mt-1">
+                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <input
+                            type="text"
+                            value={orderData.customerName}
+                            onChange={(e) => setOrderData(prev => ({ ...prev, customerName: e.target.value }))}
+                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            placeholder="Seu nome"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Telefone
+                        </label>
+                        <div className="relative mt-1">
+                          <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <input
+                            type="tel"
+                            value={orderData.customerPhone}
+                            onChange={(e) => setOrderData(prev => ({ ...prev, customerPhone: e.target.value }))}
+                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            placeholder="(11) 99999-9999"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Observações
+                        </label>
+                        <div className="relative mt-1">
+                          <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <textarea
+                            value={orderData.observations}
+                            onChange={(e) => setOrderData(prev => ({ ...prev, observations: e.target.value }))}
+                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            placeholder="Observações especiais..."
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowOrderForm(false)}
+                          className="flex-1"
+                        >
+                          Voltar
+                        </Button>
+                        <Button
+                          onClick={handleSubmitOrder}
+                          disabled={isLoading}
+                          className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold"
+                        >
+                          {isLoading ? (
+                            <div className="flex items-center space-x-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                              <span>Enviando...</span>
+                            </div>
+                          ) : (
+                            `Confirmar Pedido - R$ ${total.toFixed(2)}`
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

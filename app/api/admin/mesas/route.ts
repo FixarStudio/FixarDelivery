@@ -19,7 +19,7 @@ export async function GET() {
         },
         lastOrder: {
           include: {
-            items: {
+            orderItems: {
               include: {
                 product: true
               }
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
         },
         lastOrder: {
           include: {
-            items: {
+            orderItems: {
               include: {
                 product: true
               }
@@ -119,7 +119,7 @@ export async function PUT(req: NextRequest) {
         },
         lastOrder: {
           include: {
-            items: {
+            orderItems: {
               include: {
                 product: true
               }

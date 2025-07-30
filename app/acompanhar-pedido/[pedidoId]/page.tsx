@@ -2,364 +2,313 @@
 
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
-import { motion, AnimatePresence } from "framer-motion"
-import { CheckCircle, Clock, Flame, MapPin, User, Share2, Bell, BellOff, Package, Timer, ChefHat } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { motion } from "framer-motion"
+import { Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 
-// Mock data - em produção viria de uma API
-const mockOrderData = {
-  id: "1024",
-  status: "preparando",
-  cliente: {
-    nome: "João Silva",
-    mesa: "05",
-    endereco: "R. das Flores, 123",
-    telefone: "(11) 99999-9999",
-  },
-  horario: {
-    pedido: "19:35",
-    estimativa: "25-35 min",
-    previsaoEntrega: "20:10",
-  },
-  itens: [
-    {
-      id: 1,
-      nome: "Hambúrguer Clássico",
-      quantidade: 2,
-      preco: 32.0,
-      observacoes: "Bacon extra, sem cebola",
-    },
-    {
-      id: 2,
-      nome: "Batata Frita G",
-      quantidade: 1,
-      preco: 15.0,
-      observacoes: "",
-    },
-    {
-      id: 3,
-      nome: "Coca-Cola 350ml",
-      quantidade: 2,
-      preco: 10.0,
-      observacoes: "",
-    },
-  ],
-  total: 57.0,
-  posicaoFila: 2,
+interface OrderItem {
+  id: number
+  name: string
+  price: number
+  quantity: number
+  image?: string
 }
 
-const mockFilaData = [
-  {
-    id: "1022",
-    referencia: "Mesa 3",
-    status: "finalizado",
-    tempoRestante: "Finalizado",
-  },
-  {
-    id: "1023",
-    referencia: "João S.",
-    status: "preparando",
-    tempoRestante: "15 min",
-  },
-  {
-    id: "1024",
-    referencia: "Maria L.",
-    status: "aguardando",
-    tempoRestante: "25 min",
-  },
-  {
-    id: "1025",
-    referencia: "Mesa 7",
-    status: "aguardando",
-    tempoRestante: "35 min",
-  },
-]
+interface Order {
+  id: string
+  status: string
+  total: number
+  customerName: string
+  customerPhone?: string
+  observations?: string
+  items: OrderItem[]
+  createdAt: string
+  updatedAt: string
+}
 
 const statusConfig = {
-  aguardando: {
-    color: "bg-blue-500",
+  pending: {
+    label: "Aguardando Preparo",
+    color: "bg-yellow-500",
     icon: Clock,
-    text: "Aguardando",
-    emoji: "⏳",
+    description: "Seu pedido foi recebido e está aguardando para ser preparado"
   },
-  preparando: {
-    color: "bg-orange-500",
-    icon: Flame,
-    text: "Preparando",
-    emoji: "🔥",
+  preparing: {
+    label: "Em Preparação",
+    color: "bg-blue-500",
+    icon: Loader2,
+    description: "Seu pedido está sendo preparado na cozinha"
   },
-  finalizado: {
+  ready: {
+    label: "Pronto para Entrega",
     color: "bg-green-500",
     icon: CheckCircle,
-    text: "Finalizado",
-    emoji: "✅",
+    description: "Seu pedido está pronto e será entregue em breve"
   },
+  delivered: {
+    label: "Entregue",
+    color: "bg-green-600",
+    icon: CheckCircle,
+    description: "Seu pedido foi entregue com sucesso!"
+  },
+  cancelled: {
+    label: "Cancelado",
+    color: "bg-red-500",
+    icon: AlertCircle,
+    description: "Seu pedido foi cancelado"
+  }
 }
 
-export default function AcompanharPedido() {
+export default function AcompanharPedidoPage() {
   const params = useParams()
-  const pedidoId = params.pedidoId as string
+  const pedidoId = params?.pedidoId as string
+  
+  const [order, setOrder] = useState<Order | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const [orderData, setOrderData] = useState(mockOrderData)
-  const [filaData, setFilaData] = useState(mockFilaData)
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
-  const [currentTime, setCurrentTime] = useState(new Date())
-
-  // Simular atualizações em tempo real
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(new Date())
-      // Aqui seria a lógica de WebSocket/SSE para atualizações reais
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  const handleNotificationToggle = async () => {
-    if (!notificationsEnabled) {
-      const permission = await Notification.requestPermission()
-      if (permission === "granted") {
-        setNotificationsEnabled(true)
-        new Notification("Notificações ativadas!", {
-          body: "Você será notificado sobre atualizações do seu pedido.",
-          icon: "/placeholder-logo.png",
-        })
+    const fetchOrder = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch(`/api/orders/${pedidoId}`)
+        
+        if (!response.ok) {
+          throw new Error("Pedido não encontrado")
+        }
+        
+        const data = await response.json()
+        setOrder(data.order)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erro ao carregar pedido")
+      } finally {
+        setLoading(false)
       }
-    } else {
-      setNotificationsEnabled(false)
-    }
-  }
-
-  const handleShare = async () => {
-    const shareData = {
-      title: `Pedido #${orderData.id}`,
-      text: `Acompanhe meu pedido em tempo real!`,
-      url: window.location.href,
     }
 
-    if (navigator.share) {
-      await navigator.share(shareData)
-    } else {
-      // Fallback para copiar link
-      navigator.clipboard.writeText(window.location.href)
-      alert("Link copiado para a área de transferência!")
+    if (pedidoId) {
+      fetchOrder()
+      
+      // Atualizar status a cada 30 segundos
+      const interval = setInterval(fetchOrder, 30000)
+      return () => clearInterval(interval)
     }
+  }, [pedidoId])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Carregando pedido...</p>
+        </div>
+      </div>
+    )
   }
 
-  const getStatusIcon = (status: string) => {
-    const config = statusConfig[status as keyof typeof statusConfig]
-    const IconComponent = config?.icon || Clock
-    return <IconComponent className="h-4 w-4" />
+  if (error || !order) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Pedido não encontrado
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            {error || "O pedido solicitado não foi encontrado"}
+          </p>
+          <Button onClick={() => window.history.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar
+          </Button>
+        </div>
+      </div>
+    )
   }
 
-  const getStatusColor = (status: string) => {
-    return statusConfig[status as keyof typeof statusConfig]?.color || "bg-gray-500"
-  }
+  const currentStatus = statusConfig[order.status as keyof typeof statusConfig]
+  const StatusIcon = currentStatus?.icon || Clock
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Header de Confirmação */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-            className="inline-flex items-center justify-center w-20 h-20 bg-green-100 dark:bg-green-900/20 rounded-full mb-4"
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <Button 
+            variant="ghost" 
+            onClick={() => window.history.back()}
+            className="mb-4"
           >
-            <CheckCircle className="h-10 w-10 text-green-600" />
-          </motion.div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">🎉 Pedido Confirmado!</h1>
-          <div className="flex items-center justify-center space-x-4">
-            <Badge variant="outline" className="text-lg px-4 py-2">
-              Número: #{orderData.id}
-            </Badge>
-            <Badge className={`text-lg px-4 py-2 text-white ${getStatusColor(orderData.status)}`}>
-              {getStatusIcon(orderData.status)}
-              <span className="ml-2">{statusConfig[orderData.status as keyof typeof statusConfig]?.text}</span>
-            </Badge>
-          </div>
-        </motion.div>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar
+          </Button>
+          
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Acompanhar Pedido
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            ID: {order.id}
+          </p>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Coluna Principal */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Informações do Cliente */}
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <User className="h-5 w-5" />
-                  <span>Informações do Pedido</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Cliente</p>
-                    <p className="font-semibold">{orderData.cliente.nome}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Mesa</p>
-                    <p className="font-semibold">Mesa {orderData.cliente.mesa}</p>
-                  </div>
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Status do Pedido */}
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <StatusIcon className={`h-5 w-5 ${currentStatus?.color.replace('bg-', 'text-')}`} />
+                <span>Status do Pedido</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className={`w-4 h-4 rounded-full ${currentStatus?.color}`}></div>
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Endereço</p>
-                  <p className="font-semibold flex items-center">
-                    <MapPin className="h-4 w-4 mr-2" />
-                    {orderData.cliente.endereco}
+                  <h3 className="font-semibold text-gray-900 dark:text-white">
+                    {currentStatus?.label}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {currentStatus?.description}
                   </p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Enviado às</p>
-                  <p className="font-semibold flex items-center">
-                    <Clock className="h-4 w-4 mr-2" />
-                    {orderData.horario.pedido}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Itens do Pedido */}
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Package className="h-5 w-5" />
-                  <span>Itens do Pedido</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {orderData.itens.map((item, index) => (
-                  <div key={item.id}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <p className="font-semibold">
-                          {item.quantidade}x {item.nome}
-                        </p>
-                        {item.observacoes && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{item.observacoes}</p>
-                        )}
-                      </div>
-                      <p className="font-bold text-orange-600">R$ {item.preco.toFixed(2)}</p>
+              </div>
+              
+              <div className="pt-4 border-t">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Cliente:</span>
+                    <p className="font-medium">{order.customerName}</p>
+                  </div>
+                  {order.customerPhone && (
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Telefone:</span>
+                      <p className="font-medium">{order.customerPhone}</p>
                     </div>
-                    {index < orderData.itens.length - 1 && <Separator className="mt-4" />}
+                  )}
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Data:</span>
+                    <p className="font-medium">
+                      {new Date(order.createdAt).toLocaleDateString('pt-BR')}
+                    </p>
                   </div>
-                ))}
-                <Separator />
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Hora:</span>
+                    <p className="font-medium">
+                      {new Date(order.createdAt).toLocaleTimeString('pt-BR', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Itens do Pedido */}
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle>Itens do Pedido</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {order.items.map((item, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="flex items-center space-x-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                >
+                  {item.image && (
+                    <img
+                      src={item.image.startsWith('http') ? item.image : `https://ik.imagekit.io/fixarmenu/${item.image}`}
+                      alt={item.name}
+                      className="w-12 h-12 object-cover rounded-lg"
+                      onError={(e) => {
+                        e.currentTarget.src = "/placeholder.svg";
+                      }}
+                    />
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-sm truncate">{item.name}</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {item.quantity}x R$ {item.price.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="font-semibold text-sm">
+                      R$ {(item.price * item.quantity).toFixed(2)}
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+
+              <div className="pt-4 border-t">
                 <div className="flex justify-between items-center text-lg font-bold">
                   <span>Total:</span>
-                  <span className="text-orange-600">R$ {orderData.total.toFixed(2)}</span>
+                  <span className="text-orange-600">R$ {order.total.toFixed(2)}</span>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Ações */}
-            <div className="flex space-x-4">
-              <Button onClick={handleShare} variant="outline" className="flex-1 bg-transparent">
-                <Share2 className="h-4 w-4 mr-2" />
-                Compartilhar
-              </Button>
-              <Button onClick={handleNotificationToggle} variant="outline" className="flex-1 bg-transparent">
-                {notificationsEnabled ? (
-                  <>
-                    <BellOff className="h-4 w-4 mr-2" />
-                    Desativar Notificações
-                  </>
-                ) : (
-                  <>
-                    <Bell className="h-4 w-4 mr-2" />
-                    Ativar Notificações
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Estimativa de Tempo */}
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Timer className="h-5 w-5" />
-                  <span>Tempo Estimado</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-center space-y-4">
-                <div className="text-3xl font-bold text-orange-600">{orderData.horario.estimativa}</div>
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Baseado em:</p>
-                  <div className="flex items-center justify-center space-x-2 text-sm">
-                    <ChefHat className="h-4 w-4" />
-                    <span>Fila atual + complexidade</span>
-                  </div>
-                </div>
-                <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg">
-                  <p className="text-sm font-semibold text-orange-800 dark:text-orange-200">
-                    🕐 Previsão de entrega: {orderData.horario.previsaoEntrega}
+              {order.observations && (
+                <div className="pt-4 border-t">
+                  <h4 className="font-semibold text-sm mb-2">Observações:</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
+                    {order.observations}
                   </p>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Fila de Produção */}
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Flame className="h-5 w-5" />
-                  <span>Fila de Produção</span>
-                </CardTitle>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Acompanhe em tempo real</p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <AnimatePresence>
-                  {filaData.map((pedido, index) => (
-                    <motion.div
-                      key={pedido.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      transition={{ delay: index * 0.1 }}
-                      className={`p-3 rounded-lg border-2 transition-all ${
-                        pedido.id === orderData.id
-                          ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                          : "border-gray-200 dark:border-gray-700"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-3 h-3 rounded-full ${getStatusColor(pedido.status)}`}></div>
-                          <div>
-                            <p className="font-semibold text-sm">
-                              #{pedido.id} | {pedido.referencia}
-                            </p>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                              {statusConfig[pedido.status as keyof typeof statusConfig]?.emoji}{" "}
-                              {statusConfig[pedido.status as keyof typeof statusConfig]?.text}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium">{pedido.tempoRestante}</p>
-                        </div>
-                      </div>
-                      {pedido.id === orderData.id && (
-                        <div className="mt-2 text-center">
-                          <Badge variant="secondary" className="text-xs">
-                            ← SEU PEDIDO
-                          </Badge>
-                        </div>
-                      )}
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </CardContent>
-            </Card>
-          </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Progresso do Pedido */}
+        <Card className="mt-8 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle>Progresso do Pedido</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="relative">
+              <div className="flex items-center justify-between mb-4">
+                {Object.entries(statusConfig)
+                  .filter(([status]) => status !== 'cancelled')
+                  .map(([status, config], index) => {
+                  const isCompleted = ['pending', 'preparing', 'ready', 'delivered'].indexOf(order.status) >= 
+                    ['pending', 'preparing', 'ready', 'delivered'].indexOf(status)
+                  const isCurrent = order.status === status
+                  
+                  return (
+                    <div key={status} className="flex flex-col items-center">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        isCompleted ? config.color : 'bg-gray-300 dark:bg-gray-600'
+                      }`}>
+                        {isCompleted && <config.icon className="h-4 w-4 text-white" />}
+                      </div>
+                      <p className={`text-xs mt-2 text-center ${
+                        isCurrent ? 'font-semibold' : 'text-gray-500'
+                      }`}>
+                        {config.label}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+              
+              <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200 dark:bg-gray-700 -z-10">
+                <div 
+                  className="h-full bg-orange-500 transition-all duration-500"
+                  style={{
+                    width: `${(['pending', 'preparing', 'ready', 'delivered'].indexOf(order.status) + 1) * 25}%`
+                  }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

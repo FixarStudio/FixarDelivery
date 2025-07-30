@@ -2,17 +2,30 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Users, Clock, CheckCircle, Calendar, MapPin, QrCode } from "lucide-react"
+import { Users, Clock, CheckCircle, Calendar, MapPin, QrCode, ChevronLeft, ChevronRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
 
 interface MesaSelectorProps {
   onMesaSelect: (mesa: any) => void
   currentTable?: string | null
+}
+
+// Função para formatar data no formato brasileiro
+const formatDateBR = (date: Date | string) => {
+  const d = new Date(date)
+  return d.toLocaleDateString("pt-BR")
+}
+
+// Função para formatar hora no formato brasileiro
+const formatTimeBR = (date: Date | string) => {
+  const d = new Date(date)
+  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
 }
 
 export function MesaSelector({ onMesaSelect, currentTable }: MesaSelectorProps) {
@@ -28,6 +41,10 @@ export function MesaSelector({ onMesaSelect, currentTable }: MesaSelectorProps) 
     date: "",
     notes: "",
   })
+  
+  // Estados para o calendário
+  const [reservations, setReservations] = useState<Record<string, any[]>>({})
+  const [loadingReservations, setLoadingReservations] = useState(false)
 
   // Buscar mesas do banco de dados
   useEffect(() => {
@@ -35,11 +52,15 @@ export function MesaSelector({ onMesaSelect, currentTable }: MesaSelectorProps) 
       try {
         setLoading(true)
         const response = await fetch('/api/mesas')
+        console.log('Status da resposta:', response.status)
+        
         if (response.ok) {
           const data = await response.json()
+          console.log('Mesas carregadas:', data)
           setMesas(data)
         } else {
-          console.error('Erro ao buscar mesas')
+          const errorData = await response.json()
+          console.error('Erro ao buscar mesas:', response.status, errorData)
         }
       } catch (error) {
         console.error('Erro ao buscar mesas:', error)
@@ -180,6 +201,30 @@ export function MesaSelector({ onMesaSelect, currentTable }: MesaSelectorProps) 
     console.log('=== FIM handleMesaClick ===')
   }
 
+  const fetchReservations = async (mesaId: string, month?: string) => {
+    try {
+      setLoadingReservations(true)
+      const params = new URLSearchParams({ mesaId })
+      if (month) {
+        params.append('month', month)
+      }
+      
+      const response = await fetch(`/api/mesas/reservations?${params}`)
+      if (response.ok) {
+        const data = await response.json()
+        setReservations(data.reservations || {})
+      } else {
+        console.error('Erro ao buscar reservas')
+        setReservations({})
+      }
+    } catch (error) {
+      console.error('Erro ao buscar reservas:', error)
+      setReservations({})
+    } finally {
+      setLoadingReservations(false)
+    }
+  }
+
   const handleReserveClick = (mesa: any) => {
     setSelectedMesa(mesa)
     setReserveForm({
@@ -191,6 +236,10 @@ export function MesaSelector({ onMesaSelect, currentTable }: MesaSelectorProps) 
       notes: "",
     })
     setShowReserveModal(true)
+    
+    // Buscar reservas da mesa
+    const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
+    fetchReservations(mesa.id, currentMonth)
   }
 
   const handleReserveSubmit = async () => {
@@ -453,7 +502,14 @@ ${reserveForm.notes ? `📝 Observações: ${reserveForm.notes}` : ""}
       ))}
 
       {/* Reserve Modal */}
-      <Dialog open={showReserveModal} onOpenChange={setShowReserveModal}>
+      <Dialog open={showReserveModal} onOpenChange={(open) => {
+        setShowReserveModal(open)
+        if (!open) {
+          // Limpar estados quando o modal for fechado
+          setReservations({})
+          setSelectedMesa(null)
+        }
+      }}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
@@ -485,7 +541,10 @@ ${reserveForm.notes ? `📝 Observações: ${reserveForm.notes}` : ""}
                   id="reserve-date"
                   type="date"
                   value={reserveForm.date}
-                  onChange={(e) => setReserveForm((prev) => ({ ...prev, date: e.target.value }))}
+                  onChange={(e) => {
+                    const newDate = e.target.value
+                    setReserveForm((prev) => ({ ...prev, date: newDate }))
+                  }}
                   min={new Date().toISOString().split("T")[0]}
                 />
               </div>
@@ -559,13 +618,35 @@ ${reserveForm.notes ? `📝 Observações: ${reserveForm.notes}` : ""}
               />
             </div>
 
+            {/* Reservas Existentes */}
+            {Object.keys(reservations).length > 0 && (
+              <div className="border-t pt-4">
+                <Label className="text-sm font-medium">Reservas Existentes</Label>
+                <div className="space-y-2 mt-2">
+                  {Object.entries(reservations).map(([date, dayReservations]) => (
+                    <div key={date} className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
+                      <div className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                        {formatDateBR(date)}
+                      </div>
+                      {dayReservations.map((reservation, index) => (
+                        <div key={index} className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                          • {reservation.customerName} - {formatTimeBR(reservation.reservedFor)} 
+                          ({reservation.people} pessoas)
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex space-x-2 pt-4">
               <Button variant="outline" onClick={() => setShowReserveModal(false)} className="flex-1">
                 Cancelar
               </Button>
               <Button
                 onClick={handleReserveSubmit}
-                disabled={!reserveForm.customerName || !reserveForm.phone || !reserveForm.time}
+                disabled={!reserveForm.customerName || !reserveForm.phone || !reserveForm.time || !reserveForm.date}
                 className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
               >
                 <Calendar className="h-4 w-4 mr-2" />

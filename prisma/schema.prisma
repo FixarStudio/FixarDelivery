@@ -95,17 +95,23 @@ model DeliveryArea {
 }
 
 model Order {
-  id          String      @id @default(uuid())
-  user        User?       @relation(fields: [userId], references: [id])
-  userId      String?
-  tableId     String?
-  table       Table?
-  status      String      // aguardando, preparando, finalizado, entregue, etc
-  total       Float
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  items       OrderItem[]
-  delivery    Delivery?   // se for delivery
+  id              String      @id @default(uuid())
+  user            User?       @relation(fields: [userId], references: [id])
+  userId          String?
+  tableId         String?
+  table           Table?
+  status          String      // pending, preparing, ready, delivered, cancelled
+  total           Float
+  customerName    String      @default("Cliente")
+  customerPhone   String?
+  observations    String?
+  deliveryAddress String?
+  deliveryType    String      @default("local") // local ou delivery
+  items           Json        // Array de itens do pedido
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  orderItems      OrderItem[]
+  delivery        Delivery?   // se for delivery
 }
 
 model OrderItem {

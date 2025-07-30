@@ -73,19 +73,55 @@ export function DeliveryCartModal({
 
   const total = subtotal + deliveryFee
 
-  const handleWhatsAppOrder = () => {
-    const orderItems = cart
-      .map((item) => {
-        const extrasText = item.selectedExtras?.length
-          ? ` (${item.selectedExtras.map((extra: any) => `+${extra.name}`).join(", ")})`
-          : ""
-        const itemPrice =
-          item.price + (item.selectedExtras?.reduce((sum: number, extra: any) => sum + extra.price, 0) || 0)
-        return `${item.quantity}x ${item.name}${extrasText} - R$ ${(itemPrice * item.quantity).toFixed(2)}`
-      })
-      .join("\n")
+  const handleWhatsAppOrder = async () => {
+    try {
+      // Criar pedido no banco de dados
+      const orderData = {
+        items: cart.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price + (item.selectedExtras?.reduce((sum: number, extra: any) => sum + extra.price, 0) || 0),
+          extras: item.selectedExtras
+        })),
+        total: total,
+        customerName: "Cliente Delivery",
+        customerPhone: "",
+        observations: observations,
+        deliveryAddress: `${deliveryAddress.street}, ${deliveryAddress.number}${deliveryAddress.complement ? ` - ${deliveryAddress.complement}` : ""}, ${deliveryAddress.neighborhood} - ${deliveryAddress.city}/${deliveryAddress.state}, CEP: ${deliveryAddress.zipCode}`,
+        deliveryType: "delivery"
+      }
 
-    const message = `🛵 *PEDIDO DELIVERY*
+      const orderResponse = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(orderData),
+      })
+
+      if (!orderResponse.ok) {
+        throw new Error("Erro ao criar pedido")
+      }
+
+      const orderResult = await orderResponse.json()
+      const order = orderResult.order
+
+      const orderItems = cart
+        .map((item) => {
+          const extrasText = item.selectedExtras?.length
+            ? ` (${item.selectedExtras.map((extra: any) => `+${extra.name}`).join(", ")})`
+            : ""
+          const itemPrice =
+            item.price + (item.selectedExtras?.reduce((sum: number, extra: any) => sum + extra.price, 0) || 0)
+          return `${item.quantity}x ${item.name}${extrasText} - R$ ${(itemPrice * item.quantity).toFixed(2)}`
+        })
+        .join("\n")
+
+      // Gerar URL de acompanhamento
+      const baseUrl = window.location.origin || window.location.protocol + '//' + window.location.host
+      const trackingUrl = `${baseUrl}/acompanhar-pedido/${order.id}`
+
+      const message = `🛵 *PEDIDO DELIVERY #${order.id.slice(-6).toUpperCase()}*
 
 📅 ${new Date().toLocaleDateString("pt-BR")} - ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
 
@@ -105,13 +141,20 @@ Taxa de entrega: R$ ${deliveryFee.toFixed(2)}
 ⏱️ Tempo estimado: ${estimatedTime}
 💳 Pagamento: Na entrega
 
+📱 *ACOMPANHAR PEDIDO:*
+${trackingUrl}
+
 ${observations ? `📝 Observações: ${observations}` : ""}
 
 _Pedido realizado pelo cardápio digital_`
 
-    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
-    window.open(whatsappUrl, "_blank")
-    onClose()
+      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
+      window.open(whatsappUrl, "_blank")
+      onClose()
+    } catch (error) {
+      console.error("Erro ao criar pedido:", error)
+      alert("Erro ao criar pedido. Tente novamente.")
+    }
   }
 
   if (!isOpen) return null
