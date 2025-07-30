@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Plus, Minus, MapPin, Clock, Truck, MessageSquare, Trash2 } from "lucide-react"
+import { X, Truck, MapPin, Plus, Minus, Trash2, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -29,12 +29,36 @@ export function DeliveryCartModal({
   estimatedTime,
 }: DeliveryCartModalProps) {
   const [observations, setObservations] = useState("")
+  const [whatsappNumber, setWhatsappNumber] = useState("5511999999999")
+
+  // Carregar configurações do WhatsApp
+  useEffect(() => {
+    const loadWhatsAppConfig = async () => {
+      try {
+        const response = await fetch("/api/customization")
+        if (response.ok) {
+          const config = await response.json()
+          if (config.whatsappNumber) {
+            setWhatsappNumber(config.whatsappNumber)
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao carregar configurações do WhatsApp:", error)
+      }
+    }
+
+    loadWhatsAppConfig()
+  }, [])
 
   const updateQuantity = (productId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
       setCart(cart.filter((item) => item.id !== productId))
     } else {
-      setCart(cart.map((item) => (item.id === productId ? { ...item, quantity: newQuantity } : item)))
+      setCart(
+        cart.map((item) =>
+          item.id === productId ? { ...item, quantity: newQuantity } : item
+        )
+      )
     }
   }
 
@@ -85,7 +109,7 @@ ${observations ? `📝 Observações: ${observations}` : ""}
 
 _Pedido realizado pelo cardápio digital_`
 
-    const whatsappUrl = `https://wa.me/5511999999999?text=${encodeURIComponent(message)}`
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
     window.open(whatsappUrl, "_blank")
     onClose()
   }
@@ -253,11 +277,7 @@ _Pedido realizado pelo cardápio digital_`
             {/* Delivery Info */}
             <div className="flex items-center justify-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
               <div className="flex items-center space-x-1">
-                <Clock className="h-4 w-4" />
-                <span>Entrega: {estimatedTime}</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <Truck className="h-4 w-4" />
+                <MessageCircle className="h-4 w-4" />
                 <span>Delivery</span>
               </div>
             </div>
@@ -268,7 +288,7 @@ _Pedido realizado pelo cardápio digital_`
               disabled={cart.length === 0}
               className="w-full h-12 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold text-lg shadow-lg rounded-xl mb-2"
             >
-              <MessageSquare className="h-5 w-5 mr-2" />
+              <MessageCircle className="h-5 w-5 mr-2" />
               Finalizar Pedido via WhatsApp
             </Button>
           </div>

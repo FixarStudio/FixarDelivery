@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { MessageCircle, Phone, User, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -20,11 +20,30 @@ const quickActions = [
 export function WhatsAppIntegration() {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isVisible, setIsVisible] = useState(true)
+  const [whatsappNumber, setWhatsappNumber] = useState("5511999999999")
+
+  // Carregar configurações do WhatsApp
+  useEffect(() => {
+    const loadWhatsAppConfig = async () => {
+      try {
+        const response = await fetch("/api/customization")
+        if (response.ok) {
+          const config = await response.json()
+          if (config.whatsappNumber) {
+            setWhatsappNumber(config.whatsappNumber)
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao carregar configurações do WhatsApp:", error)
+      }
+    }
+
+    loadWhatsAppConfig()
+  }, [])
 
   const sendWhatsAppMessage = (message: string) => {
-    const phoneNumber = "5511999999999" // Número do restaurante
     const encodedMessage = encodeURIComponent(message)
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`
 
     window.open(whatsappUrl, "_blank")
     setIsExpanded(false)

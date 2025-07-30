@@ -246,21 +246,11 @@ Frete: {frete}
     secondaryColor: "#fb923c",
     accentColor: "#fed7aa",
     primaryFont: "Inter",
-    secondaryFont: "Inter",
     fontSize: 16,
     fontWeight: "400",
-    cardStyle: "elevated",
     borderRadius: 12,
-    density: "comfortable",
-    backgroundType: "gradient",
     shadowIntensity: 3,
-    animations: "subtle",
-    autoDarkMode: false,
-    parallaxEffect: false,
-    backdropBlur: true,
-    particles: false,
-    smoothTransitions: true,
-    customCursor: false,
+    whatsappNumber: "5511999999999",
   })
 
   const [logoFile, setLogoFile] = useState<File | null>(null)
@@ -275,6 +265,14 @@ Frete: {frete}
           const settings = await response.json()
           setCustomization(settings)
           applyThemeToDocument(settings)
+          
+          // Atualizar deliveryConfig com o número do WhatsApp das configurações
+          if (settings.whatsappNumber) {
+            setDeliveryConfig(prev => ({
+              ...prev,
+              whatsappNumber: settings.whatsappNumber
+            }))
+          }
         }
       } catch (error) {
         console.error("Erro ao carregar customização:", error)
@@ -286,6 +284,7 @@ Frete: {frete}
 
   // Aplicar mudanças em tempo real
   useEffect(() => {
+    console.log('Aplicando tema em tempo real:', customization)
     applyThemeToDocument(customization)
   }, [customization])
 
@@ -297,79 +296,48 @@ Frete: {frete}
     root.style.setProperty("--secondary-color", theme.secondaryColor)
     root.style.setProperty("--accent-color", theme.accentColor)
     root.style.setProperty("--primary-font", theme.primaryFont)
-    root.style.setProperty("--secondary-font", theme.secondaryFont)
     root.style.setProperty("--border-radius", `${theme.borderRadius}px`)
     root.style.setProperty("--font-size", `${theme.fontSize}px`)
     root.style.setProperty("--font-weight", theme.fontWeight)
     root.style.setProperty("--shadow-intensity", theme.shadowIntensity.toString())
+    
+    // Aplicar borderRadius em elementos específicos que podem ter bordas
+    console.log('Aplicando borderRadius global:', theme.borderRadius)
+    const elementsWithBorders = document.querySelectorAll('button, input, textarea, select, .card, .Card, div[class*="rounded"], img, .bg-white, .bg-gray-50, .bg-gray-100, .bg-gray-200, .bg-gray-300, .bg-gray-400, .bg-gray-500, .bg-gray-600, .bg-gray-700, .bg-gray-800, .bg-gray-900, .bg-red-50, .bg-red-100, .bg-red-200, .bg-red-300, .bg-red-400, .bg-red-500, .bg-red-600, .bg-red-700, .bg-red-800, .bg-red-900, .bg-orange-50, .bg-orange-100, .bg-orange-200, .bg-orange-300, .bg-orange-400, .bg-orange-500, .bg-orange-600, .bg-orange-700, .bg-orange-800, .bg-orange-900, .bg-yellow-50, .bg-yellow-100, .bg-yellow-200, .bg-yellow-300, .bg-yellow-400, .bg-yellow-500, .bg-yellow-600, .bg-yellow-700, .bg-yellow-800, .bg-yellow-900, .bg-green-50, .bg-green-100, .bg-green-200, .bg-green-300, .bg-green-400, .bg-green-500, .bg-green-600, .bg-green-700, .bg-green-800, .bg-green-900, .bg-blue-50, .bg-blue-100, .bg-blue-200, .bg-blue-300, .bg-blue-400, .bg-blue-500, .bg-blue-600, .bg-blue-700, .bg-blue-800, .bg-blue-900, .bg-indigo-50, .bg-indigo-100, .bg-indigo-200, .bg-indigo-300, .bg-indigo-400, .bg-indigo-500, .bg-indigo-600, .bg-indigo-700, .bg-indigo-800, .bg-indigo-900, .bg-purple-50, .bg-purple-100, .bg-purple-200, .bg-purple-300, .bg-purple-400, .bg-purple-500, .bg-purple-600, .bg-purple-700, .bg-purple-800, .bg-purple-900, .bg-pink-50, .bg-pink-100, .bg-pink-200, .bg-pink-300, .bg-pink-400, .bg-pink-500, .bg-pink-600, .bg-pink-700, .bg-pink-800, .bg-pink-900')
+    
+    elementsWithBorders.forEach(element => {
+      ;(element as HTMLElement).style.borderRadius = `${theme.borderRadius}px`
+    })
 
     // Aplicar classes CSS dinâmicas
     const body = document.body
 
-    // Remover classes anteriores
-    body.classList.remove(
-      "theme-gradient",
-      "theme-solid",
-      "theme-pattern",
-      "theme-image",
-      "density-compact",
-      "density-comfortable",
-      "density-spacious",
-      "card-flat",
-      "card-elevated",
-      "card-outlined",
-      "card-glass",
-      "animations-none",
-      "animations-subtle",
-      "animations-dynamic",
-    )
+    // Remover classes de intensidade de sombra
+    for (let i = 0; i <= 10; i++) {
+      body.classList.remove(`shadow-intensity-${i}`)
+    }
 
-    // Adicionar novas classes
-    body.classList.add(`theme-${theme.backgroundType}`)
-    body.classList.add(`density-${theme.density}`)
-    body.classList.add(`card-${theme.cardStyle}`)
-    body.classList.add(`animations-${theme.animations}`)
+    // Adicionar nova classe
+    console.log('Aplicando classe:', `shadow-intensity-${theme.shadowIntensity}`)
+    body.classList.add(`shadow-intensity-${theme.shadowIntensity}`)
 
     // Aplicar fonte principal
-    body.style.fontFamily = theme.primaryFont
-    body.style.fontSize = `${theme.fontSize}px`
+    console.log('Aplicando fonte:', theme.primaryFont)
+    body.style.fontFamily = `"${theme.primaryFont}", sans-serif`
+    
+    // Aplicar tamanho da fonte
+    console.log('Aplicando tamanho da fonte:', theme.fontSize)
+    root.style.fontSize = `${theme.fontSize}px`
     body.style.fontWeight = theme.fontWeight
 
-    // Aplicar backdrop blur se ativado
-    if (theme.backdropBlur) {
-      body.classList.add("backdrop-blur-enabled")
-    } else {
-      body.classList.remove("backdrop-blur-enabled")
-    }
 
-    // Aplicar efeitos especiais
-    if (theme.parallaxEffect) {
-      body.classList.add("parallax-enabled")
-    } else {
-      body.classList.remove("parallax-enabled")
-    }
-
-    if (theme.particles) {
-      body.classList.add("particles-enabled")
-    } else {
-      body.classList.remove("particles-enabled")
-    }
-
-    if (theme.smoothTransitions) {
-      body.classList.add("smooth-transitions")
-    } else {
-      body.classList.remove("smooth-transitions")
-    }
-
-    if (theme.customCursor) {
-      body.classList.add("custom-cursor")
-    } else {
-      body.classList.remove("custom-cursor")
-    }
   }
 
   const applyCustomization = async () => {
     try {
+      console.log('Iniciando applyCustomization...')
+      console.log('customization atual:', customization)
+      
       // Salvar no banco de dados
       const response = await fetch("/api/admin/customization", {
         method: "POST",
@@ -380,6 +348,7 @@ Frete: {frete}
       })
 
       if (response.ok) {
+        console.log('Configurações salvas no banco, aplicando tema...')
         // Aplicar tema ao documento
         applyThemeToDocument(customization)
 
@@ -412,21 +381,11 @@ Frete: {frete}
       secondaryColor: "#fb923c",
       accentColor: "#fed7aa",
       primaryFont: "Inter",
-      secondaryFont: "Inter",
       fontSize: 16,
       fontWeight: "400",
-      cardStyle: "elevated",
       borderRadius: 12,
-      density: "comfortable",
-      backgroundType: "gradient",
       shadowIntensity: 3,
-      animations: "subtle",
-      autoDarkMode: false,
-      parallaxEffect: false,
-      backdropBlur: true,
-      particles: false,
-      smoothTransitions: true,
-      customCursor: false,
+      whatsappNumber: "5511999999999",
     }
 
     try {
@@ -2159,19 +2118,6 @@ Frete: {frete}
                             <option value="Lora">Lora (Tradicional)</option>
                           </select>
                         </div>
-                        <div>
-                          <Label>Fonte Secundária</Label>
-                          <select
-                            className="w-full p-2 border border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600"
-                            value={customization.secondaryFont}
-                            onChange={(e) => setCustomization((prev) => ({ ...prev, secondaryFont: e.target.value }))}
-                          >
-                            <option value="Inter">Inter</option>
-                            <option value="Roboto">Roboto</option>
-                            <option value="Open Sans">Open Sans</option>
-                            <option value="Source Sans Pro">Source Sans Pro</option>
-                          </select>
-                        </div>
                       </div>
                       <div className="space-y-4">
                         <div>
@@ -2219,22 +2165,6 @@ Frete: {frete}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-4">
                         <div>
-                          <Label>Estilo dos Cards</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {["flat", "elevated", "outlined", "glass"].map((style) => (
-                              <Button
-                                key={style}
-                                variant={customization.cardStyle === style ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setCustomization((prev) => ({ ...prev, cardStyle: style }))}
-                                className="capitalize"
-                              >
-                                {style === "glass" ? "Vidro" : style}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
                           <Label>Raio das Bordas</Label>
                           <div className="flex items-center space-x-4">
                             <Slider
@@ -2248,50 +2178,6 @@ Frete: {frete}
                               className="flex-1"
                             />
                             <span className="text-sm font-medium w-12">{customization.borderRadius}px</span>
-                          </div>
-                        </div>
-                        <div>
-                          <Label>Densidade do Layout</Label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {["compact", "comfortable", "spacious"].map((density) => (
-                              <Button
-                                key={density}
-                                variant={customization.density === density ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setCustomization((prev) => ({ ...prev, density: density }))}
-                                className="capitalize text-xs"
-                              >
-                                {density === "compact"
-                                  ? "Compacto"
-                                  : density === "comfortable"
-                                    ? "Confortável"
-                                    : "Espaçoso"}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="space-y-4">
-                        <div>
-                          <Label>Tema de Fundo</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {["gradient", "solid", "pattern", "image"].map((bg) => (
-                              <Button
-                                key={bg}
-                                variant={customization.backgroundType === bg ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setCustomization((prev) => ({ ...prev, backgroundType: bg }))}
-                                className="capitalize text-xs"
-                              >
-                                {bg === "gradient"
-                                  ? "Gradiente"
-                                  : bg === "solid"
-                                    ? "Sólido"
-                                    : bg === "pattern"
-                                      ? "Padrão"
-                                      : "Imagem"}
-                              </Button>
-                            ))}
                           </div>
                         </div>
                         <div>
@@ -2310,114 +2196,12 @@ Frete: {frete}
                             <span className="text-sm font-medium w-8">{customization.shadowIntensity}</span>
                           </div>
                         </div>
-                        <div>
-                          <Label>Animações</Label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {["none", "subtle", "dynamic"].map((anim) => (
-                              <Button
-                                key={anim}
-                                variant={customization.animations === anim ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setCustomization((prev) => ({ ...prev, animations: anim }))}
-                                className="capitalize text-xs"
-                              >
-                                {anim === "none" ? "Nenhuma" : anim === "subtle" ? "Sutil" : "Dinâmica"}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Advanced Features */}
-                <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Settings className="h-5 w-5" />
-                      <span>Recursos Avançados</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Modo Escuro Automático</Label>
-                            <p className="text-xs text-gray-500">Seguir preferência do sistema</p>
-                          </div>
-                          <Switch
-                            checked={customization.autoDarkMode}
-                            onCheckedChange={(checked) =>
-                              setCustomization((prev) => ({ ...prev, autoDarkMode: checked }))
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Efeito Parallax</Label>
-                            <p className="text-xs text-gray-500">Movimento suave no scroll</p>
-                          </div>
-                          <Switch
-                            checked={customization.parallaxEffect}
-                            onCheckedChange={(checked) =>
-                              setCustomization((prev) => ({ ...prev, parallaxEffect: checked }))
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Blur de Fundo</Label>
-                            <p className="text-xs text-gray-500">Efeito vidro fosco</p>
-                          </div>
-                          <Switch
-                            checked={customization.backdropBlur}
-                            onCheckedChange={(checked) =>
-                              setCustomization((prev) => ({ ...prev, backdropBlur: checked }))
-                            }
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Partículas Animadas</Label>
-                            <p className="text-xs text-gray-500">Efeitos visuais de fundo</p>
-                          </div>
-                          <Switch
-                            checked={customization.particles}
-                            onCheckedChange={(checked) => setCustomization((prev) => ({ ...prev, particles: checked }))}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Transições Suaves</Label>
-                            <p className="text-xs text-gray-500">Animações entre páginas</p>
-                          </div>
-                          <Switch
-                            checked={customization.smoothTransitions}
-                            onCheckedChange={(checked) =>
-                              setCustomization((prev) => ({ ...prev, smoothTransitions: checked }))
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Cursor Personalizado</Label>
-                            <p className="text-xs text-gray-500">Cursor temático</p>
-                          </div>
-                          <Switch
-                            checked={customization.customCursor}
-                            onCheckedChange={(checked) =>
-                              setCustomization((prev) => ({ ...prev, customCursor: checked }))
-                            }
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+
               </div>
 
               {/* Right Column - Live Preview + Ações rápidas */}
@@ -2459,15 +2243,35 @@ Frete: {frete}
               <CardContent className="space-y-4">
                 <div>
                   <Label htmlFor="whatsapp-number">Número do WhatsApp</Label>
-                  <Input id="whatsapp-number" placeholder="+55 11 99999-9999" defaultValue="+55 11 99999-9999" />
+                  <div className="flex">
+                    <span className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-md dark:bg-gray-600 dark:text-gray-400 dark:border-gray-600">
+                      <Phone className="h-4 w-4" />
+                    </span>
+                    <Input 
+                      id="whatsapp-number" 
+                      placeholder="5511999999999" 
+                      value={customization.whatsappNumber || "5511999999999"}
+                      onChange={(e) => setCustomization((prev) => ({ ...prev, whatsappNumber: e.target.value }))}
+                      className="rounded-l-none"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="welcome-message">Mensagem de Boas-vindas</Label>
-                  <Textarea id="welcome-message" placeholder="Olá! Bem-vindo ao nosso restaurante..." rows={3} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="auto-response">Resposta Automática</Label>
-                  <Switch id="auto-response" />
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setCustomization((prev) => ({ ...prev, whatsappNumber: "5511999999999" }))
+                    }}
+                  >
+                    Resetar
+                  </Button>
+                  <Button
+                    onClick={applyCustomization}
+                    className="bg-green-500 hover:bg-green-600"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Salvar
+                  </Button>
                 </div>
               </CardContent>
             </Card>

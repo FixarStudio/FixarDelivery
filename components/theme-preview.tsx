@@ -10,6 +10,13 @@ interface ThemePreviewProps {
 }
 
 export function ThemePreview({ customization }: ThemePreviewProps) {
+  // Calcular sombra baseada na intensidade
+  const getShadowStyle = () => {
+    if (customization.shadowIntensity === 0) return 'none'
+    const intensity = customization.shadowIntensity / 10
+    return `0 ${intensity * 4}px ${intensity * 6}px rgba(0, 0, 0, ${intensity * 0.1})`
+  }
+
   return (
     <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
       <CardHeader>
@@ -24,7 +31,9 @@ export function ThemePreview({ customization }: ThemePreviewProps) {
             className="p-4 rounded-lg text-center font-bold text-lg flex items-center justify-center space-x-3"
             style={{ 
               backgroundColor: customization.accentColor,
-              color: customization.primaryColor
+              color: customization.primaryColor,
+              borderRadius: `${customization.borderRadius}px`,
+              boxShadow: getShadowStyle()
             }}
           >
             {customization.restaurantLogo && (
@@ -44,7 +53,8 @@ export function ThemePreview({ customization }: ThemePreviewProps) {
               borderRadius: `${customization.borderRadius}px`,
               fontFamily: customization.primaryFont,
               fontSize: `${customization.fontSize}px`,
-              fontWeight: customization.fontWeight
+              fontWeight: customization.fontWeight,
+              boxShadow: getShadowStyle()
             }}
           >
             <CardContent className="p-4">
@@ -52,7 +62,10 @@ export function ThemePreview({ customization }: ThemePreviewProps) {
                 {/* Imagem do Produto */}
                 <div 
                   className="w-20 h-20 rounded-lg flex-shrink-0"
-                  style={{ backgroundColor: customization.accentColor }}
+                  style={{ 
+                    backgroundColor: customization.accentColor,
+                    borderRadius: `${customization.borderRadius}px`
+                  }}
                 />
                 
                 {/* Detalhes do Produto */}
@@ -77,7 +90,9 @@ export function ThemePreview({ customization }: ThemePreviewProps) {
             className="w-full"
             style={{ 
               backgroundColor: customization.primaryColor,
-              borderColor: customization.primaryColor
+              borderColor: customization.primaryColor,
+              borderRadius: `${customization.borderRadius}px`,
+              boxShadow: getShadowStyle()
             }}
           >
             <ShoppingCart className="h-4 w-4 mr-2" />
@@ -88,8 +103,8 @@ export function ThemePreview({ customization }: ThemePreviewProps) {
           <div className="text-xs text-gray-500 space-y-1">
             <p>Fonte: {customization.primaryFont}</p>
             <p>Tamanho: {customization.fontSize}px</p>
-            <p>Estilo: {customization.cardStyle}</p>
             <p>Bordas: {customization.borderRadius}px</p>
+            <p>Sombras: {customization.shadowIntensity}/10</p>
           </div>
         </div>
       </CardContent>

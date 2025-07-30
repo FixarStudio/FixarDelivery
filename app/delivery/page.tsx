@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Search, ShoppingCart, Moon, Sun, MapPin, Truck } from "lucide-react"
+import { Search, ShoppingCart, Moon, Sun, Truck, MapPin, Clock, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DeliveryCartModal } from "@/components/delivery/delivery-cart-modal"
 import { AddressForm } from "@/components/delivery/address-form"
+import { useTheme } from "@/hooks/use-theme"
 import { ProductCard } from "@/components/product-card"
 
 // Mock data para demonstração
@@ -34,6 +35,7 @@ const deliveryConfig = {
 }
 
 export default function DeliveryPage() {
+  useTheme() // Aplicar tema automaticamente
   const [isDark, setIsDark] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
@@ -47,12 +49,35 @@ export default function DeliveryPage() {
   const [products, setProducts] = useState<any[]>([])
   const [loadingProducts, setLoadingProducts] = useState(true)
 
-  const [restaurantInfo] = useState({
+  const [restaurantInfo, setRestaurantInfo] = useState({
     name: "Restaurante Premium",
     logo: "/placeholder.svg?height=60&width=120",
     phone: "5511999999999",
     address: "Rua Principal, 123 - Centro",
   })
+
+  // Carregar configurações do restaurante
+  useEffect(() => {
+    const loadRestaurantConfig = async () => {
+      try {
+        const response = await fetch("/api/customization")
+        if (response.ok) {
+          const config = await response.json()
+          setRestaurantInfo(prev => ({
+            ...prev,
+            name: config.restaurantName || "Restaurante Premium",
+            phone: config.whatsappNumber || "5511999999999",
+          }))
+          
+
+        }
+      } catch (error) {
+        console.error("Erro ao carregar configurações do restaurante:", error)
+      }
+    }
+
+    loadRestaurantConfig()
+  }, [])
 
   const fetchProducts = async () => {
     try {

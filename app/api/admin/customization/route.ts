@@ -22,18 +22,8 @@ export async function GET() {
         secondaryFont: "Inter",
         fontSize: 16,
         fontWeight: "400",
-        cardStyle: "elevated",
         borderRadius: 12,
-        density: "comfortable",
-        backgroundType: "gradient",
         shadowIntensity: 3,
-        animations: "subtle",
-        autoDarkMode: false,
-        parallaxEffect: false,
-        backdropBlur: true,
-        particles: false,
-        smoothTransitions: true,
-        customCursor: false,
       };
       
       return NextResponse.json(defaultSettings);

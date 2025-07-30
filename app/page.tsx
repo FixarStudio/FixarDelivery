@@ -11,10 +11,12 @@ import { WhatsAppIntegration } from "@/components/whatsapp-integration"
 import { MesaStatusBar } from "@/components/estabelecimento/mesa-status-bar"
 import { MesaSelector } from "@/components/estabelecimento/mesa-selector"
 import { CategoryTabs } from "@/components/category-tabs"
+import { useTheme } from "@/hooks/use-theme"
 
 // Categorias base para inicialização
 
 export default function EstabelecimentoPage() {
+  useTheme() // Aplicar tema automaticamente
   const [isDark, setIsDark] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
@@ -76,6 +78,8 @@ export default function EstabelecimentoPage() {
             accentColor: config.accentColor || "#fed7aa",
             restaurantLogo: config.restaurantLogo || null,
           })
+          
+
           
           console.log("Nome do restaurante definido como:", config.restaurantName)
         } else {
